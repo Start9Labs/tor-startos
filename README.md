@@ -43,7 +43,7 @@ Tor relay or bridge to support the network.
 | ------------- | --------------------------------------------- |
 | Base image    | Alpine Linux 3.21 with upstream `tor` package |
 | Architectures | x86_64, aarch64, riscv64                      |
-| Entrypoint    | `tor -f /etc/tor/torrc`                       |
+| Entrypoint    | `tor -f /var/lib/tor/torrc`                   |
 | User          | `tor` (non-root)                              |
 
 The image is minimal -- just Alpine + the `tor` package. No custom patches
