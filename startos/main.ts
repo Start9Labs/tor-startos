@@ -1,13 +1,10 @@
 import type { HealthCheckResult } from '@start9labs/start-sdk/package/lib/health/checkFns'
 import { connect } from 'node:net'
-import { torrc } from './fileModels/torrc'
 import { i18n } from './i18n'
 import { sdk } from './sdk'
 
 export const main = sdk.setupMain(async ({ effects }) => {
   console.info('Starting Tor!')
-
-  await torrc.read().const(effects)
 
   const torSub = await sdk.SubContainer.of(
     effects,

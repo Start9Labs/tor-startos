@@ -41,7 +41,9 @@ const inputSpec = InputSpec.of({
   }),
 }).add(({ Value }) => ({
   address: Value.dynamicUnion(async ({ prefill }) => {
-    const { packageId, hostId, internalPort } = prefill?.urlPluginMetadata ?? {}
+    const { packageId: rawPkgId, hostId, internalPort } =
+      prefill?.urlPluginMetadata ?? {}
+    const packageId = rawPkgId ?? 'STARTOS'
 
     const config = await torrc.read().once()
     const entries =
@@ -141,8 +143,9 @@ export const addOnionService = sdk.Action.withInput(
 
   // execution
   async ({ effects, input }) => {
-    const { packageId, hostId, interfaceId, internalPort } =
+    const { packageId: rawPkgId, hostId, interfaceId, internalPort } =
       input.urlPluginMetadata
+    const packageId = rawPkgId ?? 'STARTOS'
     const address = input.address as {
       selection: string
       value: { privateKey?: string | null }
@@ -151,10 +154,13 @@ export const addOnionService = sdk.Action.withInput(
     const defaultHost =
       packageId === 'STARTOS' ? 'startos' : `${packageId}.startos`
 
-    // Look up the binding for this internalPort
-    const iface = await sdk.serviceInterface
-      .get(effects, { packageId, id: interfaceId })
-      .once()
+    // Look up the binding for this internalPort (STARTOS has no service interface)
+    const iface =
+      packageId !== 'STARTOS'
+        ? await sdk.serviceInterface
+            .get(effects, { packageId, id: interfaceId })
+            .once()
+        : null
 
     const host = iface?.host
     const binding = host?.bindings[internalPort]

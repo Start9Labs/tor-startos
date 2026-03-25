@@ -41,8 +41,9 @@ export const deleteOnionService = sdk.Action.withInput(
 
   // execution
   async ({ effects, input }) => {
-    const { packageId, hostId, hostname, port, ssl } = input.urlPluginMetadata
-    if (!packageId) return
+    const { packageId: rawPkgId, hostId, hostname, port, ssl } =
+      input.urlPluginMetadata
+    const packageId = rawPkgId ?? 'STARTOS'
 
     const config = await torrc.read().once()
     const onionServices = structuredClone(config?.onionServices || {})
@@ -63,17 +64,18 @@ export const deleteOnionService = sdk.Action.withInput(
       if (onionHostname !== hostname) continue
 
       // Found the matching entry — remove the specific port
+      // Use undefined (not delete) so merge() removes the key from the file
       const portKey = port !== null ? String(port) : null
       if (portKey && svc.ports[portKey]) {
         const portInfo = svc.ports[portKey]
         if ((portInfo.ssl || false) === ssl) {
-          delete svc.ports[portKey]
+          ;(svc.ports as any)[portKey] = undefined
         }
       }
 
-      // If no ports remain, remove the entire entry
-      if (Object.keys(svc.ports).length === 0) {
-        delete services[key]
+      // If no ports remain, remove the entire entry and key material
+      if (Object.values(svc.ports).every((v) => v === undefined)) {
+        ;(services as any)[key] = undefined
         await rm(sdk.volumes.tor.subpath(hsDir(packageId, hostId, key)), {
           recursive: true,
           force: true,
@@ -83,11 +85,15 @@ export const deleteOnionService = sdk.Action.withInput(
     }
 
     // Clean up empty host/package entries
-    if (Object.keys(services).length === 0) {
-      delete onionServices[packageId][hostId]
+    if (Object.values(services).every((v) => v === undefined)) {
+      ;(onionServices[packageId] as any)[hostId] = undefined
     }
-    if (Object.keys(onionServices[packageId] || {}).length === 0) {
-      delete onionServices[packageId]
+    if (
+      Object.values(onionServices[packageId] || {}).every(
+        (v) => v === undefined,
+      )
+    ) {
+      ;(onionServices as any)[packageId] = undefined
     }
 
     await torrc.merge(effects, { onionServices })
