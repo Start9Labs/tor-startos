@@ -10,9 +10,9 @@ import { reloadTorrc } from './reloadTorrc'
 import { seedFiles } from './seedFiles'
 
 export const init = sdk.setupInit(
-  seedFiles,
   restoreInit,
   versionGraph,
+  seedFiles,
   setInterfaces,
   setDependencies,
   actions,
