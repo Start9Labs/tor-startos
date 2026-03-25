@@ -171,7 +171,13 @@ export const addOnionService = sdk.Action.withInput(
       { target: string; ssl: boolean; internalPort: number }
     > = {}
 
-    if (input.ssl && binding?.options.addSsl) {
+    if (input.ssl && packageId === 'STARTOS') {
+      newPorts['443'] = {
+        target: `${defaultHost}:443`,
+        ssl: true,
+        internalPort: 80,
+      }
+    } else if (input.ssl && binding?.options.addSsl) {
       const sslAddr = binding.addresses.available.find(
         (a) =>
           a.ssl &&
