@@ -77,6 +77,13 @@ export const migrateOnionAddresses = sdk.setupOnInit(async (effects) => {
             ssl: false,
             internalPort: Number(internalPort),
           }
+          if (b.options.addSsl) {
+            ports[String(b.options.addSsl.preferredExternalPort)] = {
+              target: `startos:${b.net.assignedSslPort}`,
+              ssl: true,
+              internalPort: Number(internalPort),
+            }
+          }
         }
       }
     }
