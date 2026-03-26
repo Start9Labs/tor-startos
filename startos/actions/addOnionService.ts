@@ -59,14 +59,14 @@ const inputSpec = InputSpec.of({
     > = {}
 
     for (const [key, entry] of Object.entries(entries)) {
-      if (internalPort == null) continue
+      if (!entry || internalPort == null) continue
 
       // Show address only if it partially serves this binding (has one of SSL/non-SSL but not both)
       const bindingPorts = Object.values(entry.ports).filter(
-        (p) => p.internalPort === internalPort,
+        (p) => p?.internalPort === internalPort,
       )
-      const hasNonSsl = bindingPorts.some((p) => !p.ssl)
-      const hasSsl = bindingPorts.some((p) => p.ssl)
+      const hasNonSsl = bindingPorts.some((p) => p && !p.ssl)
+      const hasSsl = bindingPorts.some((p) => p?.ssl)
       if (hasNonSsl === hasSsl) continue // skip if has both or neither
 
       let hostname = key
@@ -225,7 +225,7 @@ export const addOnionService = sdk.Action.withInput(
       const existing = services[address.selection]
       if (existing) {
         const duplicate = Object.values(existing.ports).some(
-          (p) => p.ssl === !!input.ssl && p.internalPort === internalPort,
+          (p) => p?.ssl === !!input.ssl && p?.internalPort === internalPort,
         )
         if (duplicate) {
           throw new Error(

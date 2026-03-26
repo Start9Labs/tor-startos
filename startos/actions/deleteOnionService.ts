@@ -51,6 +51,7 @@ export const deleteOnionService = sdk.Action.withInput(
     if (!services) return
 
     for (const [key, svc] of Object.entries(services)) {
+      if (!svc) continue
       let onionHostname: string | undefined
       try {
         const content = await sdk.volumes.tor.readFile(

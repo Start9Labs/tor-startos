@@ -84,8 +84,8 @@ export const migrateOnionAddresses = sdk.setupOnInit(async (effects) => {
     if (!onionServices[packageId]) onionServices[packageId] = {}
     if (!onionServices[packageId][hostId]) onionServices[packageId][hostId] = {}
 
-    const entryKey = nextKey(onionServices[packageId][hostId])
-    onionServices[packageId][hostId][entryKey] = { ports }
+    const entryKey = nextKey(onionServices[packageId][hostId]!)
+    onionServices[packageId][hostId]![entryKey] = { ports }
 
     const dir = hsDir(packageId, hostId, entryKey)
     const { secretKey, hostname } = generateOnionFiles(key)

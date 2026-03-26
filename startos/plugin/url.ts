@@ -22,14 +22,17 @@ export const exportUrls = sdk.plugin.url.setupExportedUrls(
       if (packageId === 'STARTOS') continue
 
       const hostIds = await sdk.serviceInterface
-        .getAll(effects, { packageId }, (ifaces) =>
-          new Set(ifaces.map((i) => i.addressInfo?.hostId).filter(Boolean)),
+        .getAll(
+          effects,
+          { packageId },
+          (ifaces) =>
+            new Set(ifaces.map((i) => i.addressInfo?.hostId).filter(Boolean)),
         )
         .const()
 
       for (const [hostId, services] of Object.entries(hosts)) {
         if (!hostIds.has(hostId)) {
-          for (const index of Object.keys(services)) {
+          for (const index of Object.keys(services ?? {})) {
             await rm(sdk.volumes.tor.subpath(hsDir(packageId, hostId, index)), {
               recursive: true,
               force: true,
@@ -52,9 +55,7 @@ export const exportUrls = sdk.plugin.url.setupExportedUrls(
       // Writing the cleaned config triggers the .const() watcher, which
       // re-invokes this function. On the second run removed is empty,
       // so Phase 2 exports the URLs. This is why we return early here.
-      console.info(
-        `Removed stale onion service entries: ${removed.join(', ')}`,
-      )
+      console.info(`Removed stale onion service entries: ${removed.join(', ')}`)
       await torrc.merge(
         effects,
         { onionServices: cleaned },
@@ -66,7 +67,7 @@ export const exportUrls = sdk.plugin.url.setupExportedUrls(
     // Phase 2: Export URLs for all valid entries
     for (const [packageId, hosts] of Object.entries(onionServices)) {
       for (const [hostId, services] of Object.entries(hosts)) {
-        for (const [i, svc] of Object.entries(services)) {
+        for (const [i, svc] of Object.entries(services ?? {})) {
           const hostnameFile = FileHelper.string({
             base: sdk.volumes.tor,
             subpath: `${hsDir(packageId, hostId, i)}/hostname`,
@@ -74,7 +75,10 @@ export const exportUrls = sdk.plugin.url.setupExportedUrls(
           const hostname = await hostnameFile.read().const(effects)
           if (!hostname) continue
 
-          for (const [externalPort, portInfo] of Object.entries(svc.ports)) {
+          for (const [externalPort, portInfo] of Object.entries(
+            svc?.ports ?? {},
+          )) {
+            if (!portInfo) continue
             await sdk.plugin.url
               .exportUrl(effects, {
                 hostnameInfo: {

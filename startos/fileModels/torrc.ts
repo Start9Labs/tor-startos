@@ -7,9 +7,11 @@ const portInfoShape = z.object({
   internalPort: z.number(),
 })
 
-export const onionServiceEntryShape = z.object({
-  ports: z.record(z.string(), portInfoShape),
-})
+export const onionServiceEntryShape = z
+  .object({
+    ports: z.record(z.string(), portInfoShape.optional().catch(undefined)),
+  })
+  .catch({ ports: {} })
 
 export const relayShape = z.object({
   enabled: z.boolean().catch(false),
@@ -25,7 +27,10 @@ const shape = z.object({
   onionServices: z
     .record(
       z.string(),
-      z.record(z.string(), z.record(z.string(), onionServiceEntryShape)),
+      z.record(
+        z.string(),
+        z.record(z.string(), onionServiceEntryShape.optional()).optional(),
+      ),
     )
     .catch({}),
   relay: relayShape.catch({
@@ -73,13 +78,16 @@ function toFile(config: TorrcConfig): string {
   const onionServices = config.onionServices || {}
   for (const [packageId, hosts] of Object.entries(onionServices)) {
     for (const [hostId, services] of Object.entries(hosts)) {
+      if (!services) continue
       Object.entries(services).forEach(([index, svc]) => {
+        if (!svc) return
         if (Object.keys(svc.ports).length === 0) return
         lines.push(`# @service ${packageId} ${hostId}`)
         lines.push(
           `HiddenServiceDir /var/lib/tor/${hsDir(packageId, hostId, index)}/`,
         )
         for (const [externalPort, portInfo] of Object.entries(svc.ports)) {
+          if (!portInfo) continue
           if (portInfo.ssl) lines.push(`# @ssl ${portInfo.internalPort}`)
           lines.push(`HiddenServicePort ${externalPort} ${portInfo.target}`)
         }
@@ -113,7 +121,13 @@ function toFile(config: TorrcConfig): string {
 function fromFile(raw: string): unknown {
   const res: z.infer<typeof shape> = {
     onionServices: {},
-    relay: { enabled: false, bridge: false, orPort: 9001, bandwidthRate: 1, bandwidthBurst: 2 },
+    relay: {
+      enabled: false,
+      bridge: false,
+      orPort: 9001,
+      bandwidthRate: 1,
+      bandwidthBurst: 2,
+    },
   }
 
   const lines = raw.split('\n')
@@ -137,7 +151,7 @@ function fromFile(raw: string): unknown {
         res.onionServices[currentPackageId] = {}
       if (!res.onionServices[currentPackageId][currentHostId])
         res.onionServices[currentPackageId][currentHostId] = {}
-      res.onionServices[currentPackageId][currentHostId][currentIndex] = {
+      res.onionServices[currentPackageId][currentHostId]![currentIndex] = {
         ports: currentPorts,
       }
     }
