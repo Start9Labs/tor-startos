@@ -19,7 +19,7 @@ export const exportUrls = sdk.plugin.url.setupExportedUrls(
     const removed: string[] = []
 
     for (const [packageId, hosts] of Object.entries(cleaned)) {
-      if (packageId === 'STARTOS') continue
+      if (packageId === 'STARTOS' || !hosts) continue
 
       const hostIds = await sdk.serviceInterface
         .getAll(
@@ -66,6 +66,7 @@ export const exportUrls = sdk.plugin.url.setupExportedUrls(
 
     // Phase 2: Export URLs for all valid entries
     for (const [packageId, hosts] of Object.entries(onionServices)) {
+      if (!hosts) continue
       for (const [hostId, services] of Object.entries(hosts)) {
         for (const [i, svc] of Object.entries(services ?? {})) {
           const hostnameFile = FileHelper.string({

@@ -27,10 +27,16 @@ const shape = z.object({
   onionServices: z
     .record(
       z.string(),
-      z.record(
-        z.string(),
-        z.record(z.string(), onionServiceEntryShape.optional()).optional(),
-      ),
+      z
+        .record(
+          z.string(),
+          z
+            .record(z.string(), onionServiceEntryShape.optional().catch(undefined))
+            .optional()
+            .catch(undefined),
+        )
+        .optional()
+        .catch(undefined),
     )
     .catch({}),
   relay: relayShape.catch({
@@ -77,6 +83,7 @@ function toFile(config: TorrcConfig): string {
 
   const onionServices = config.onionServices || {}
   for (const [packageId, hosts] of Object.entries(onionServices)) {
+    if (!hosts) continue
     for (const [hostId, services] of Object.entries(hosts)) {
       if (!services) continue
       Object.entries(services).forEach(([index, svc]) => {
@@ -149,9 +156,9 @@ function fromFile(raw: string): unknown {
     ) {
       if (!res.onionServices[currentPackageId])
         res.onionServices[currentPackageId] = {}
-      if (!res.onionServices[currentPackageId][currentHostId])
-        res.onionServices[currentPackageId][currentHostId] = {}
-      res.onionServices[currentPackageId][currentHostId]![currentIndex] = {
+      if (!res.onionServices[currentPackageId]![currentHostId])
+        res.onionServices[currentPackageId]![currentHostId] = {}
+      res.onionServices[currentPackageId]![currentHostId]![currentIndex] = {
         ports: currentPorts,
       }
     }
