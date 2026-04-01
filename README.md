@@ -27,12 +27,14 @@ Tor relay or bridge to support the network.
 - [Installation and First-Run Flow](#installation-and-first-run-flow)
 - [Configuration Management](#configuration-management)
 - [Network Access and Interfaces](#network-access-and-interfaces)
-- [Actions](#actions-startos-ui)
+- [Actions (StartOS UI)](#actions-startos-ui)
 - [URL Plugin](#url-plugin)
 - [Backups and Restore](#backups-and-restore)
 - [Health Checks](#health-checks)
+- [Dependencies](#dependencies)
 - [Limitations and Differences](#limitations-and-differences)
 - [What Is Unchanged from Upstream](#what-is-unchanged-from-upstream)
+- [Contributing](#contributing)
 - [Quick Reference for AI Consumers](#quick-reference-for-ai-consumers)
 
 ---
@@ -41,7 +43,7 @@ Tor relay or bridge to support the network.
 
 | Property      | Value                                         |
 | ------------- | --------------------------------------------- |
-| Base image    | Alpine Linux 3.21 with upstream `tor` package |
+| Base image    | Alpine Linux with upstream `tor` package |
 | Architectures | x86_64, aarch64, riscv64                      |
 | Entrypoint    | `tor -f /var/lib/tor/torrc`                   |
 | User          | `tor` (non-root)                              |
@@ -187,6 +189,12 @@ any service's interface directly from the service's URL table.
 
 ---
 
+## Dependencies
+
+None.
+
+---
+
 ## Limitations and Differences
 
 1. **No exit relay support.** `ExitRelay 0` is always set. This package only
@@ -207,6 +215,10 @@ any service's interface directly from the service's URL table.
 - Relay and bridge protocol behavior
 - Tor directory authority connections
 - Automatic circuit building and path selection
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for build instructions and development workflow.
 
 ---
 
