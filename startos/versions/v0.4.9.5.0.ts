@@ -1,7 +1,7 @@
 import { VersionInfo } from '@start9labs/start-sdk'
 
-export const v_0_4_9_5_0_b8 = VersionInfo.of({
-  version: '0.4.9.5:0-beta.8',
+export const v_0_4_9_5_0 = VersionInfo.of({
+  version: '0.4.9.5:0',
   releaseNotes: {
     en_US: 'Fix bug where cleaning up a stale onion service entry could wipe all onion services',
     es_ES: 'Corrección de error donde la limpieza de una entrada de servicio onion obsoleta podía borrar todos los servicios onion',

@@ -41,8 +41,11 @@ const inputSpec = InputSpec.of({
   }),
 }).add(({ Value }) => ({
   address: Value.dynamicUnion(async ({ prefill }) => {
-    const { packageId: rawPkgId, hostId, internalPort } =
-      prefill?.urlPluginMetadata ?? {}
+    const {
+      packageId: rawPkgId,
+      hostId,
+      internalPort,
+    } = prefill?.urlPluginMetadata ?? {}
     const packageId = rawPkgId ?? 'STARTOS'
 
     const config = await torrc.read().once()
@@ -143,8 +146,12 @@ export const addOnionService = sdk.Action.withInput(
 
   // execution
   async ({ effects, input }) => {
-    const { packageId: rawPkgId, hostId, interfaceId, internalPort } =
-      input.urlPluginMetadata
+    const {
+      packageId: rawPkgId,
+      hostId,
+      interfaceId,
+      internalPort,
+    } = input.urlPluginMetadata
     const packageId = rawPkgId ?? 'STARTOS'
     const address = input.address as {
       selection: string
