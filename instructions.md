@@ -8,7 +8,7 @@ You've installed Tor — it lets the rest of StartOS make outbound requests over
 
 ## What you get on StartOS
 
-- A running Tor daemon with a **SOCKS5 proxy** on `127.0.0.1:9050` that other StartOS services use to reach `.onion` destinations.
+- A running Tor daemon with a **SOCKS5 proxy** at `tor.startos:9050` that other StartOS services use to reach `.onion` destinations.
 - The ability to **add a `.onion` address to any interface of any other installed service**, optionally with your own vanity key.
 - Optional **relay or bridge mode** to contribute capacity to the Tor network.
 
