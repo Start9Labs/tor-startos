@@ -9,7 +9,6 @@ export const manifest = setupManifest({
   upstreamRepo: 'https://gitlab.torproject.org/tpo/core/tor/',
   marketingUrl: 'https://www.torproject.org/',
   donationUrl: 'https://donate.torproject.org/',
-  docsUrls: ['https://community.torproject.org/onion-services/'],
   description: i18n.description,
   volumes: ['tor', 'startos'],
   images: {
