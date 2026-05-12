@@ -16,7 +16,7 @@ You've installed Tor — it lets the rest of StartOS make outbound requests over
 
 ### Adding a .onion address to another service
 
-Open the other service's **Interfaces** panel and add a Tor address there. You can supply a base64 ed25519 expanded private key for a vanity address, or leave that blank and StartOS will generate a fresh key. The `.onion` lives with the service whose interface you attached it to — it appears and disappears with that interface.
+Open the specific interface of the other service you want to expose over Tor. On that interface's page you'll find a **Tor** table; from there you can add or remove hidden services for that interface. When adding one you can supply a base64 ed25519 expanded private key for a vanity address, or leave that blank and StartOS will generate a fresh key. The `.onion` lives with the interface you attached it to — it appears and disappears with that interface.
 
 ### Running a relay or bridge
 
