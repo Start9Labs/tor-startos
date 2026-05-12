@@ -1,7 +1,5 @@
 # Tor
 
-You've installed Tor — it lets the rest of StartOS make outbound requests over the Tor network and lets you attach a `.onion` address to any interface of any other installed service.
-
 ## Documentation
 
 - [Tor onion service guide](https://community.torproject.org/onion-services/) — the upstream guide to onion services and operator-grade configuration.
