@@ -43,6 +43,17 @@ export const main = sdk.setupMain(async ({ effects }) => {
         ready: {
           display: i18n('Tor SOCKS Proxy'),
           fn: checkBootstrap,
+          // Poll every 1s while bootstrapping. defaultTrigger polls 'loading'
+          // only every 30s, so the first "Bootstrapping: 0%" reading stuck for
+          // 30s while Tor actually finished — the UI showed 0% long after Tor
+          // was done. Tor bootstraps in seconds, so we want frequent updates
+          // until it reports success (then back off to the 30s default).
+          trigger: sdk.trigger.statusTrigger(30_000, {
+            starting: 1_000,
+            waiting: 1_000,
+            failure: 1_000,
+            loading: 1_000,
+          }),
         },
         requires: ['chown'],
       })
