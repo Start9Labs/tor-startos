@@ -51,21 +51,24 @@ export const exportUrls = sdk.plugin.url.setupExportedUrls(
       }
     }
 
+    // Persist the cleaned config if we dropped any stale entries. We must NOT
+    // return early here: setupExportedUrls calls clearUrls({ except }) with the
+    // URLs exported during this run, so returning before Phase 2 would leave
+    // `except` empty and transiently wipe every package's onion from every host
+    // — firing host-info watchers and restarting every service that watches its
+    // own address. Instead we fall through and export the survivors in the same
+    // pass, so clearUrls only prunes the genuinely-stale entries.
     if (removed.length) {
-      // Writing the cleaned config triggers the .const() watcher, which
-      // re-invokes this function. On the second run removed is empty,
-      // so Phase 2 exports the URLs. This is why we return early here.
       console.info(`Removed stale onion service entries: ${removed.join(', ')}`)
       await torrc.merge(
         effects,
         { onionServices: cleaned },
         { allowWriteAfterConst: true },
       )
-      return
     }
 
-    // Phase 2: Export URLs for all valid entries
-    for (const [packageId, hosts] of Object.entries(onionServices)) {
+    // Phase 2: Export URLs for all surviving entries
+    for (const [packageId, hosts] of Object.entries(cleaned)) {
       if (!hosts) continue
       for (const [hostId, services] of Object.entries(hosts)) {
         for (const [i, svc] of Object.entries(services ?? {})) {
