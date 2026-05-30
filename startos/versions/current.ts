@@ -1,16 +1,12 @@
 import { VersionInfo, IMPOSSIBLE } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '0.4.9.8:2',
+  version: '0.4.9.8:3',
   releaseNotes: {
     en_US: `**Fixes**
 
-- Fixed the bootstrap health check showing "Bootstrapping: 0%" long after Tor had finished, by polling progress every second while loading
-- Fixed a bug where uninstalling a service would momentarily clear every package's Tor (.onion) address, causing unrelated services to restart
-
-**Bumps**
-
-- start-sdk → 1.5.3`,
+- Fixed non-SSL Tor onion services pointing at unreachable sibling-container DNS names (\`<packageId>.startos:<port>\`), which produced \`EndReason::MISC\` on stream begin and "I/O error: SOCKS: Connection refused" in client UIs. Onion services now forward to the lxcbr0 ipv4 gateway address (matches the SSL branch).
+- Added a one-time torrc migration that reconciles every existing non-SSL HiddenServicePort target against the upstream package's current binding, so onion services created by older Tor wrappers start working again without manual delete/re-add.`,
     es_ES: `**Correcciones**
 
 - Se corrigió que la comprobación de estado mostrara "Arrancando: 0%" mucho después de que Tor hubiera terminado, consultando el progreso cada segundo durante la carga

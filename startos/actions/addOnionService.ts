@@ -206,10 +206,41 @@ export const addOnionService = sdk.Action.withInput(
           internalPort: 80,
         }
       } else if (binding?.enabled) {
-        newPorts[String(binding.options.preferredExternalPort)] = {
-          target: `${defaultHost}:${internalPort}`,
-          ssl: false,
-          internalPort,
+        // Prefer the lxcbr0 ipv4 gateway address (StartOS-managed
+        // port-forward) over the bare container DNS name. Other LXC
+        // packages cannot route to a sibling package's private container
+        // IP — only the lxcbr0 gateway is reachable. The SSL branch
+        // above already does this; this branch was using
+        // `<packageId>.startos:<internalPort>` which resolves to the
+        // unreachable container IP and yields `Host is unreachable` from
+        // inside the tor container, surfacing to Tor clients as
+        // `EndReason::MISC` ("SOCKS: Connection refused" in the UI).
+        //
+        // Selection order:
+        //   1. plaintext lxcbr0 ipv4 (best match for non-SSL onion)
+        //   2. any lxcbr0 ipv4 (graceful fallback when the binding only
+        //      exposes an SSL-wrapped port — tor blind-forwards bytes,
+        //      and the user already opted to expose this binding)
+        //   3. defaultHost (broken sibling-IP path; last-resort to keep
+        //      legacy behaviour if no lxcbr0 ipv4 entry exists at all)
+        const lxcAddrs = binding.addresses.available.filter(
+          (a) => a.metadata.kind === 'ipv4' && a.metadata.gateway === 'lxcbr0',
+        )
+        const chosen =
+          lxcAddrs.find((a) => !a.ssl && a.port !== null) ??
+          lxcAddrs.find((a) => a.port !== null)
+        if (chosen) {
+          newPorts[String(binding.options.preferredExternalPort)] = {
+            target: `${chosen.hostname}:${chosen.port}`,
+            ssl: false,
+            internalPort,
+          }
+        } else {
+          newPorts[String(binding.options.preferredExternalPort)] = {
+            target: `${defaultHost}:${internalPort}`,
+            ssl: false,
+            internalPort,
+          }
         }
       } else {
         newPorts[String(internalPort)] = {
