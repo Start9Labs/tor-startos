@@ -8,7 +8,7 @@ import { sdk } from '../sdk'
  * Two distinct legacy/stale states this fixes:
  *
  *   1. Targets of the form `<packageId>.startos:<internalPort>` written by
- *      pre-0.4.9.8:8 add-onion-service runs. Those DNS names resolve to a
+ *      pre-0.4.9.8:3 add-onion-service runs. Those DNS names resolve to a
  *      sibling LXC container's private IP, which is NOT routable from the
  *      tor LXC — only the lxcbr0 gateway address is. The hidden service
  *      published fine but failed to open a stream to the target, surfaced
