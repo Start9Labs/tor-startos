@@ -206,17 +206,36 @@ export const addOnionService = sdk.Action.withInput(
           internalPort: 80,
         }
       } else if (binding?.enabled) {
+        // Target the static lxcbr0 ipv4 gateway forward. Tor resolves a
+        // HiddenServicePort target hostname only once, at config-parse time,
+        // and caches the result as a literal IP (hs_port_config_t.real_addr);
+        // it never re-resolves. The gateway IP is static and StartOS DNATs
+        // it to the live container, so there is nothing for tor to cache
+        // stale. A binding exposes a plaintext (`ssl: false`) lxcbr0 entry
+        // only when it actually serves plaintext on the host; an SSL-only
+        // binding (addSsl, or native `secure.ssl`) has none. A non-SSL onion
+        // has no honest target there, so refuse rather than wrap it in TLS.
+        const plaintext = binding.addresses.available.find(
+          (a) =>
+            a.metadata.kind === 'ipv4' &&
+            a.metadata.gateway === 'lxcbr0' &&
+            !a.ssl &&
+            a.port !== null,
+        )
+        if (!plaintext) {
+          throw new Error(
+            `Cannot create a non-SSL onion service for "${packageId}": its interface exposes no plaintext endpoint (it is SSL-only). Create an SSL onion service instead, or have the package expose a plaintext port.`,
+          )
+        }
         newPorts[String(binding.options.preferredExternalPort)] = {
-          target: `${defaultHost}:${internalPort}`,
+          target: `${plaintext.hostname}:${plaintext.port}`,
           ssl: false,
           internalPort,
         }
       } else {
-        newPorts[String(internalPort)] = {
-          target: `${defaultHost}:${internalPort}`,
-          ssl: false,
-          internalPort,
-        }
+        throw new Error(
+          `Cannot create an onion service for "${packageId}": interface binding ${internalPort} is not exposed, so there is no reachable endpoint to forward to.`,
+        )
       }
     }
 

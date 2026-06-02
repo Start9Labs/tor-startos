@@ -31,7 +31,10 @@ const shape = z.object({
         .record(
           z.string(),
           z
-            .record(z.string(), onionServiceEntryShape.optional().catch(undefined))
+            .record(
+              z.string(),
+              onionServiceEntryShape.optional().catch(undefined),
+            )
             .optional()
             .catch(undefined),
         )
@@ -70,8 +73,9 @@ export function nextKey(record: Record<string, unknown>): string {
 
 /**
  * Serializes structured config to a torrc file.
- * Embeds `# @service` and `# @ssl` comment annotations so fromFile() can
- * reconstruct the structured data (packageId, hostId, SSL status) on read.
+ * Embeds `# @service`, `# @ssl`, and `# @internalPort` comment annotations so
+ * fromFile() can reconstruct the structured data (packageId, hostId, SSL
+ * status, upstream internal port) on read.
  */
 function toFile(config: TorrcConfig): string {
   const lines: string[] = [
@@ -96,6 +100,7 @@ function toFile(config: TorrcConfig): string {
         for (const [externalPort, portInfo] of Object.entries(svc.ports)) {
           if (!portInfo) continue
           if (portInfo.ssl) lines.push(`# @ssl ${portInfo.internalPort}`)
+          else lines.push(`# @internalPort ${portInfo.internalPort}`)
           lines.push(`HiddenServicePort ${externalPort} ${portInfo.target}`)
         }
         lines.push('')
@@ -121,7 +126,8 @@ function toFile(config: TorrcConfig): string {
 /**
  * Parses a torrc file back into structured config.
  * Uses a state machine to group HiddenServiceDir/HiddenServicePort blocks,
- * reading `# @service` and `# @ssl` annotations to recover metadata.
+ * reading `# @service`, `# @ssl`, and `# @internalPort` annotations to
+ * recover metadata.
  * Bandwidth values are stored as numbers in MBytes; parseInt extracts the
  * leading number from the "N MBytes" format we always write.
  */
@@ -146,6 +152,7 @@ function fromFile(raw: string): unknown {
     { target: string; ssl: boolean; internalPort: number }
   > = {}
   let nextSslInternalPort: number | null = null
+  let nextInternalPort: number | null = null
 
   function flushCurrent() {
     if (
@@ -167,6 +174,7 @@ function fromFile(raw: string): unknown {
     currentIndex = null
     currentPorts = {}
     nextSslInternalPort = null
+    nextInternalPort = null
   }
 
   for (const line of lines) {
@@ -183,6 +191,12 @@ function fromFile(raw: string): unknown {
     const sslMatch = trimmed.match(/^# @ssl (\d+)$/)
     if (sslMatch) {
       nextSslInternalPort = parseInt(sslMatch[1], 10)
+      continue
+    }
+
+    const internalPortMatch = trimmed.match(/^# @internalPort (\d+)$/)
+    if (internalPortMatch) {
+      nextInternalPort = parseInt(internalPortMatch[1], 10)
       continue
     }
 
@@ -203,10 +217,15 @@ function fromFile(raw: string): unknown {
         }
         nextSslInternalPort = null
       } else {
-        // For non-SSL, internalPort is the port from the target (host:port)
+        // Prefer the `# @internalPort` annotation; fall back to the target
+        // port for legacy entries written before the annotation existed
+        // (where it equals the lxcbr0 NAT port, not the upstream internal
+        // port, for SSL-wrapped/port-shifted bindings).
         const colonIdx = target.lastIndexOf(':')
-        const internalPort = parseInt(target.slice(colonIdx + 1), 10)
+        const internalPort =
+          nextInternalPort ?? parseInt(target.slice(colonIdx + 1), 10)
         currentPorts[portMatch[1]] = { target, ssl: false, internalPort }
+        nextInternalPort = null
       }
       continue
     }
