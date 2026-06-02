@@ -8,12 +8,16 @@ import { sdk } from '../sdk'
  * Two distinct legacy/stale states this fixes:
  *
  *   1. Targets of the form `<packageId>.startos:<internalPort>` written by
- *      pre-0.4.9.8:3 add-onion-service runs. Those DNS names resolve to a
- *      sibling LXC container's private IP, which is NOT routable from the
- *      tor LXC — only the lxcbr0 gateway address is. The hidden service
- *      published fine but failed to open a stream to the target, surfaced
- *      to clients as `EndReason::MISC` and rendered as
- *      "I/O error: SOCKS: Connection refused" in app UIs.
+ *      pre-0.4.9.8:3 add-onion-service runs. Tor resolves a
+ *      HiddenServicePort target hostname only once, at config-parse time,
+ *      and caches the IP (hs_port_config_t.real_addr); it never re-resolves
+ *      per connection. So these targets freeze the upstream container's
+ *      DHCP IP and go stale whenever that IP changes (restart, addSsl
+ *      toggle, reinstall) — tor keeps dialing the dead IP, the hidden
+ *      service publishes fine but can't open a stream to the target,
+ *      surfaced to clients as `EndReason::MISC` and rendered as
+ *      "I/O error: SOCKS: Connection refused" in app UIs. The static
+ *      lxcbr0 gateway forward has no hostname for tor to cache stale.
  *
  *   2. lxcbr0 targets whose port no longer matches the current binding.
  *      Happens after an upstream package changes its `bindPort()` config

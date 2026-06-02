@@ -206,22 +206,26 @@ export const addOnionService = sdk.Action.withInput(
           internalPort: 80,
         }
       } else if (binding?.enabled) {
-        // Prefer the lxcbr0 ipv4 gateway address (StartOS-managed
-        // port-forward) over the bare container DNS name. Other LXC
-        // packages cannot route to a sibling package's private container
-        // IP — only the lxcbr0 gateway is reachable. The SSL branch
-        // above already does this; this branch was using
-        // `<packageId>.startos:<internalPort>` which resolves to the
-        // unreachable container IP and yields `Host is unreachable` from
-        // inside the tor container, surfacing to Tor clients as
-        // `EndReason::MISC` ("SOCKS: Connection refused" in the UI).
+        // Target the static lxcbr0 ipv4 gateway forward, not the
+        // `<packageId>.startos` DNS name. Tor resolves a HiddenServicePort
+        // target hostname only once, at config-parse time, and caches the
+        // result as a literal IP (hs_port_config_t.real_addr); it never
+        // re-resolves per connection. So a `<packageId>.startos` target
+        // freezes the upstream container's current DHCP IP, and goes stale
+        // the moment that container's IP changes (restart, addSsl toggle,
+        // reinstall) — tor keeps dialing the dead IP, yielding `Host is
+        // unreachable` and surfacing to clients as `EndReason::MISC`
+        // ("SOCKS: Connection refused"). The gateway IP is static and
+        // always present, and StartOS DNATs it to the live container, so
+        // there is nothing for tor to cache stale. The SSL branch above
+        // already targets the gateway for the same reason.
         //
         // Selection order:
         //   1. plaintext lxcbr0 ipv4 (best match for non-SSL onion)
         //   2. any lxcbr0 ipv4 (graceful fallback when the binding only
         //      exposes an SSL-wrapped port — tor blind-forwards bytes,
         //      and the user already opted to expose this binding)
-        //   3. defaultHost (broken sibling-IP path; last-resort to keep
+        //   3. defaultHost (the stale-prone DNS path; last-resort to keep
         //      legacy behaviour if no lxcbr0 ipv4 entry exists at all)
         const lxcAddrs = binding.addresses.available.filter(
           (a) => a.metadata.kind === 'ipv4' && a.metadata.gateway === 'lxcbr0',
