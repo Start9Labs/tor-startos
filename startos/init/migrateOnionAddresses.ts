@@ -72,8 +72,20 @@ export const migrateOnionAddresses = sdk.setupOnInit(async (effects) => {
       ports = {}
       for (const [internalPort, b] of Object.entries(host.bindings)) {
         if (b.enabled) {
+          // Target the static lxcbr0 gateway forward, not the stale-prone
+          // `<pkg>.startos` container hostname (tor caches the resolved IP
+          // for the life of the config). Matches addOnionService.
+          const lxcAddrs = b.addresses.available.filter(
+            (a) =>
+              a.metadata.kind === 'ipv4' && a.metadata.gateway === 'lxcbr0',
+          )
+          const chosen =
+            lxcAddrs.find((a) => !a.ssl && a.port !== null) ??
+            lxcAddrs.find((a) => a.port !== null)
           ports[String(b.options.preferredExternalPort)] = {
-            target: `${defaultHost}:${internalPort}`,
+            target: chosen
+              ? `${chosen.hostname}:${chosen.port}`
+              : `${defaultHost}:${internalPort}`,
             ssl: false,
             internalPort: Number(internalPort),
           }

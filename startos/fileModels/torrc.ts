@@ -96,6 +96,7 @@ function toFile(config: TorrcConfig): string {
         for (const [externalPort, portInfo] of Object.entries(svc.ports)) {
           if (!portInfo) continue
           if (portInfo.ssl) lines.push(`# @ssl ${portInfo.internalPort}`)
+          else lines.push(`# @internalPort ${portInfo.internalPort}`)
           lines.push(`HiddenServicePort ${externalPort} ${portInfo.target}`)
         }
         lines.push('')
@@ -146,6 +147,7 @@ function fromFile(raw: string): unknown {
     { target: string; ssl: boolean; internalPort: number }
   > = {}
   let nextSslInternalPort: number | null = null
+  let nextInternalPort: number | null = null
 
   function flushCurrent() {
     if (
@@ -167,6 +169,7 @@ function fromFile(raw: string): unknown {
     currentIndex = null
     currentPorts = {}
     nextSslInternalPort = null
+    nextInternalPort = null
   }
 
   for (const line of lines) {
@@ -183,6 +186,12 @@ function fromFile(raw: string): unknown {
     const sslMatch = trimmed.match(/^# @ssl (\d+)$/)
     if (sslMatch) {
       nextSslInternalPort = parseInt(sslMatch[1], 10)
+      continue
+    }
+
+    const internalPortMatch = trimmed.match(/^# @internalPort (\d+)$/)
+    if (internalPortMatch) {
+      nextInternalPort = parseInt(internalPortMatch[1], 10)
       continue
     }
 
@@ -203,10 +212,15 @@ function fromFile(raw: string): unknown {
         }
         nextSslInternalPort = null
       } else {
-        // For non-SSL, internalPort is the port from the target (host:port)
+        // Prefer the `# @internalPort` annotation; fall back to the target
+        // port for legacy entries written before the annotation existed
+        // (where it equals the lxcbr0 NAT port, not the upstream internal
+        // port, for SSL-wrapped/port-shifted bindings).
         const colonIdx = target.lastIndexOf(':')
-        const internalPort = parseInt(target.slice(colonIdx + 1), 10)
+        const internalPort =
+          nextInternalPort ?? parseInt(target.slice(colonIdx + 1), 10)
         currentPorts[portMatch[1]] = { target, ssl: false, internalPort }
+        nextInternalPort = null
       }
       continue
     }
