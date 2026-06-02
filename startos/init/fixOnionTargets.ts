@@ -25,11 +25,14 @@ import { sdk } from '../sdk'
  *      the assigned external ports. Old torrc entries become stale; tor
  *      blind-forwards to a closed port and fails the same way.
  *
- * For each affected entry we pick the same target the addOnionService
- * non-SSL branch would pick today: prefer plaintext lxcbr0 ipv4, fall
- * back to any lxcbr0 ipv4 (the upstream may only expose an SSL-wrapped
- * port; tor blind-forwards bytes either way — .onion already provides
- * E2E auth).
+ * For each affected entry we pick the same target addOnionService would
+ * pick today: the plaintext (`ssl:false`) lxcbr0 ipv4 endpoint. If the
+ * binding exposes no plaintext endpoint (SSL-only — addSsl or native
+ * secure.ssl), a non-SSL onion has no honest target, so we delete the
+ * stale record rather than wrap a plaintext onion in TLS. (The action
+ * refuses to create such a record now; this cleans up any left by older
+ * wrappers.) Bindings we can't currently look up (package uninstalled or
+ * mid-startup) are left untouched.
  */
 export const fixOnionTargets = sdk.setupOnInit(async (effects) => {
   console.info('[fixOnionTargets] starting reconciliation')
@@ -38,7 +41,9 @@ export const fixOnionTargets = sdk.setupOnInit(async (effects) => {
     console.info('[fixOnionTargets] no torrc / no onion services')
     return
   }
-  console.info(`[fixOnionTargets] scanning ${Object.keys(cfg.onionServices).length} packages`)
+  console.info(
+    `[fixOnionTargets] scanning ${Object.keys(cfg.onionServices).length} packages`,
+  )
 
   const updated = structuredClone(cfg.onionServices)
   let changed = 0
@@ -56,7 +61,9 @@ export const fixOnionTargets = sdk.setupOnInit(async (effects) => {
           try {
             const iface = await sdk.serviceInterface
               .getAll(effects, { packageId }, (ifaces) =>
-                ifaces.filter((i) => i.addressInfo?.hostId === hostId && i.host),
+                ifaces.filter(
+                  (i) => i.addressInfo?.hostId === hostId && i.host,
+                ),
               )
               .once()
             const host = iface[0]?.host
@@ -71,56 +78,56 @@ export const fixOnionTargets = sdk.setupOnInit(async (effects) => {
             // port (which addOnionService used as the entry key) and
             // fall back to the only-binding-on-this-host case.
             const bindingEntries = Object.entries(host.bindings)
-            let binding =
+            const bindingEntry =
               bindingEntries.find(
                 ([, b]) =>
                   String(b.options.preferredExternalPort) === externalPort,
-              )?.[1] ??
-              (bindingEntries.length === 1 ? bindingEntries[0][1] : undefined)
-            if (!binding) continue
+              ) ?? (bindingEntries.length === 1 ? bindingEntries[0] : undefined)
+            if (!bindingEntry) continue
+            const [internalPortKey, binding] = bindingEntry
 
-            const lxcAddrs = binding.addresses.available.filter(
+            // A non-SSL onion is only valid against a plaintext (`ssl:false`)
+            // lxcbr0 endpoint. SSL-only bindings (addSsl / native secure.ssl)
+            // expose none. The action refuses to create such a record now, but
+            // a stale one from an older wrapper may exist — delete it rather
+            // than wrap a plaintext onion in TLS.
+            const plaintext = binding.addresses.available.find(
               (a) =>
-                a.metadata.kind === 'ipv4' && a.metadata.gateway === 'lxcbr0',
+                a.metadata.kind === 'ipv4' &&
+                a.metadata.gateway === 'lxcbr0' &&
+                !a.ssl &&
+                a.port !== null,
             )
-            const lxcAddr =
-              lxcAddrs.find((a) => !a.ssl && a.port !== null) ??
-              lxcAddrs.find((a) => a.port !== null)
-            console.info(
-              `[fixOnionTargets] ${packageId}/${hostId} ext:${externalPort} ` +
-                `current_target:${port.target} ` +
-                `lxcAddrs:${JSON.stringify(
-                  lxcAddrs.map((a) => ({ ssl: a.ssl, h: a.hostname, p: a.port })),
-                )}`,
-            )
-            if (!lxcAddr || lxcAddr.port === null) continue
+            if (!plaintext) {
+              delete (svc.ports as Record<string, unknown>)[externalPort]
+              changed++
+              console.warn(
+                `[fixOnionTargets] ${packageId}/${hostId} port ${externalPort}: SSL-only binding, no plaintext endpoint; deleting invalid non-SSL onion target ${port.target}`,
+              )
+              continue
+            }
 
-            const expectedTarget = `${lxcAddr.hostname}:${lxcAddr.port}`
-            // Also recompute the internalPort from the current binding
-            // so subsequent reads see correct data.
-            const correctInternalPort = Object.entries(host.bindings).find(
-              ([, b]) => b === binding,
-            )?.[0]
-            const newInternalPort = correctInternalPort
-              ? parseInt(correctInternalPort, 10)
-              : port.internalPort
+            const expectedTarget = `${plaintext.hostname}:${plaintext.port}`
+            const internalPort = parseInt(internalPortKey, 10)
             if (
               port.target === expectedTarget &&
-              port.internalPort === newInternalPort
+              port.internalPort === internalPort
             )
               continue
-
-            ;(svc.ports as any)[externalPort] = {
+            ;(svc.ports as Record<string, typeof port>)[externalPort] = {
               ...port,
               target: expectedTarget,
-              internalPort: newInternalPort,
+              internalPort,
             }
             changed++
             console.info(
-              `[fixOnionTargets] ${packageId}/${hostId} port ${externalPort}: ${port.target} → ${expectedTarget} (internalPort ${port.internalPort} → ${newInternalPort})`,
+              `[fixOnionTargets] ${packageId}/${hostId} port ${externalPort}: ${port.target} → ${expectedTarget} (internalPort ${port.internalPort} → ${internalPort})`,
             )
           } catch (e) {
-            console.error(`[fixOnionTargets] failed for ${packageId}/${hostId}:`, e)
+            console.error(
+              `[fixOnionTargets] failed for ${packageId}/${hostId}:`,
+              e,
+            )
           }
         }
       }
@@ -129,7 +136,9 @@ export const fixOnionTargets = sdk.setupOnInit(async (effects) => {
 
   if (changed > 0) {
     await torrc.merge(effects, { onionServices: updated })
-    console.info(`[fixOnionTargets] rewrote ${changed} target(s); torrc updated, tor will reload`)
+    console.info(
+      `[fixOnionTargets] reconciled ${changed} target(s); torrc updated, tor will reload`,
+    )
   } else {
     console.info('[fixOnionTargets] no changes needed')
   }

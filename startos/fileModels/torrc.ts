@@ -31,7 +31,10 @@ const shape = z.object({
         .record(
           z.string(),
           z
-            .record(z.string(), onionServiceEntryShape.optional().catch(undefined))
+            .record(
+              z.string(),
+              onionServiceEntryShape.optional().catch(undefined),
+            )
             .optional()
             .catch(undefined),
         )
@@ -70,8 +73,9 @@ export function nextKey(record: Record<string, unknown>): string {
 
 /**
  * Serializes structured config to a torrc file.
- * Embeds `# @service` and `# @ssl` comment annotations so fromFile() can
- * reconstruct the structured data (packageId, hostId, SSL status) on read.
+ * Embeds `# @service`, `# @ssl`, and `# @internalPort` comment annotations so
+ * fromFile() can reconstruct the structured data (packageId, hostId, SSL
+ * status, upstream internal port) on read.
  */
 function toFile(config: TorrcConfig): string {
   const lines: string[] = [
@@ -122,7 +126,8 @@ function toFile(config: TorrcConfig): string {
 /**
  * Parses a torrc file back into structured config.
  * Uses a state machine to group HiddenServiceDir/HiddenServicePort blocks,
- * reading `# @service` and `# @ssl` annotations to recover metadata.
+ * reading `# @service`, `# @ssl`, and `# @internalPort` annotations to
+ * recover metadata.
  * Bandwidth values are stored as numbers in MBytes; parseInt extracts the
  * leading number from the "N MBytes" format we always write.
  */

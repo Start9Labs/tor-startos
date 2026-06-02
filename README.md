@@ -62,8 +62,8 @@ or modifications to the Tor binary.
 
 The `torrc` configuration file is stored on the `tor` volume and is the single
 source of truth for all onion service and relay settings. It is generated from
-structured data and round-trips cleanly (metadata is embedded as `# @service`
-and `# @ssl` comment annotations).
+structured data and round-trips cleanly (metadata is embedded as `# @service`,
+`# @ssl`, and `# @internalPort` comment annotations).
 
 Onion service keys are stored under
 `/var/lib/tor/hidden_services/<packageId>/<hostId>/hs_<index>/`.

@@ -72,22 +72,23 @@ export const migrateOnionAddresses = sdk.setupOnInit(async (effects) => {
       ports = {}
       for (const [internalPort, b] of Object.entries(host.bindings)) {
         if (b.enabled) {
-          // Target the static lxcbr0 gateway forward, not the stale-prone
-          // `<pkg>.startos` container hostname (tor caches the resolved IP
-          // for the life of the config). Matches addOnionService.
-          const lxcAddrs = b.addresses.available.filter(
+          // A non-SSL onion needs a plaintext (`ssl:false`) lxcbr0 endpoint
+          // (the static gateway forward — tor caches the resolved target IP
+          // for the life of the config). SSL-only bindings expose none; skip
+          // rather than emit an invalid record. Matches addOnionService.
+          const plaintext = b.addresses.available.find(
             (a) =>
-              a.metadata.kind === 'ipv4' && a.metadata.gateway === 'lxcbr0',
+              a.metadata.kind === 'ipv4' &&
+              a.metadata.gateway === 'lxcbr0' &&
+              !a.ssl &&
+              a.port !== null,
           )
-          const chosen =
-            lxcAddrs.find((a) => !a.ssl && a.port !== null) ??
-            lxcAddrs.find((a) => a.port !== null)
-          ports[String(b.options.preferredExternalPort)] = {
-            target: chosen
-              ? `${chosen.hostname}:${chosen.port}`
-              : `${defaultHost}:${internalPort}`,
-            ssl: false,
-            internalPort: Number(internalPort),
+          if (plaintext) {
+            ports[String(b.options.preferredExternalPort)] = {
+              target: `${plaintext.hostname}:${plaintext.port}`,
+              ssl: false,
+              internalPort: Number(internalPort),
+            }
           }
           if (b.options.addSsl) {
             ports[String(b.options.addSsl.preferredExternalPort)] = {

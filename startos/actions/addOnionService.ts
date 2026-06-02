@@ -206,52 +206,36 @@ export const addOnionService = sdk.Action.withInput(
           internalPort: 80,
         }
       } else if (binding?.enabled) {
-        // Target the static lxcbr0 ipv4 gateway forward, not the
-        // `<packageId>.startos` DNS name. Tor resolves a HiddenServicePort
-        // target hostname only once, at config-parse time, and caches the
-        // result as a literal IP (hs_port_config_t.real_addr); it never
-        // re-resolves per connection. So a `<packageId>.startos` target
-        // freezes the upstream container's current DHCP IP, and goes stale
-        // the moment that container's IP changes (restart, addSsl toggle,
-        // reinstall) — tor keeps dialing the dead IP, yielding `Host is
-        // unreachable` and surfacing to clients as `EndReason::MISC`
-        // ("SOCKS: Connection refused"). The gateway IP is static and
-        // always present, and StartOS DNATs it to the live container, so
-        // there is nothing for tor to cache stale. The SSL branch above
-        // already targets the gateway for the same reason.
-        //
-        // Selection order:
-        //   1. plaintext lxcbr0 ipv4 (best match for non-SSL onion)
-        //   2. any lxcbr0 ipv4 (graceful fallback when the binding only
-        //      exposes an SSL-wrapped port — tor blind-forwards bytes,
-        //      and the user already opted to expose this binding)
-        //   3. defaultHost (the stale-prone DNS path; last-resort to keep
-        //      legacy behaviour if no lxcbr0 ipv4 entry exists at all)
-        const lxcAddrs = binding.addresses.available.filter(
-          (a) => a.metadata.kind === 'ipv4' && a.metadata.gateway === 'lxcbr0',
+        // Target the static lxcbr0 ipv4 gateway forward. Tor resolves a
+        // HiddenServicePort target hostname only once, at config-parse time,
+        // and caches the result as a literal IP (hs_port_config_t.real_addr);
+        // it never re-resolves. The gateway IP is static and StartOS DNATs
+        // it to the live container, so there is nothing for tor to cache
+        // stale. A binding exposes a plaintext (`ssl: false`) lxcbr0 entry
+        // only when it actually serves plaintext on the host; an SSL-only
+        // binding (addSsl, or native `secure.ssl`) has none. A non-SSL onion
+        // has no honest target there, so refuse rather than wrap it in TLS.
+        const plaintext = binding.addresses.available.find(
+          (a) =>
+            a.metadata.kind === 'ipv4' &&
+            a.metadata.gateway === 'lxcbr0' &&
+            !a.ssl &&
+            a.port !== null,
         )
-        const chosen =
-          lxcAddrs.find((a) => !a.ssl && a.port !== null) ??
-          lxcAddrs.find((a) => a.port !== null)
-        if (chosen) {
-          newPorts[String(binding.options.preferredExternalPort)] = {
-            target: `${chosen.hostname}:${chosen.port}`,
-            ssl: false,
-            internalPort,
-          }
-        } else {
-          newPorts[String(binding.options.preferredExternalPort)] = {
-            target: `${defaultHost}:${internalPort}`,
-            ssl: false,
-            internalPort,
-          }
+        if (!plaintext) {
+          throw new Error(
+            `Cannot create a non-SSL onion service for "${packageId}": its interface exposes no plaintext endpoint (it is SSL-only). Create an SSL onion service instead, or have the package expose a plaintext port.`,
+          )
         }
-      } else {
-        newPorts[String(internalPort)] = {
-          target: `${defaultHost}:${internalPort}`,
+        newPorts[String(binding.options.preferredExternalPort)] = {
+          target: `${plaintext.hostname}:${plaintext.port}`,
           ssl: false,
           internalPort,
         }
+      } else {
+        throw new Error(
+          `Cannot create an onion service for "${packageId}": interface binding ${internalPort} is not exposed, so there is no reachable endpoint to forward to.`,
+        )
       }
     }
 
