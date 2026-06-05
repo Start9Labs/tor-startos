@@ -5,7 +5,6 @@ import { setInterfaces } from '../interfaces'
 import { exportUrls, registerUrlPlugin } from '../plugin/url'
 import { sdk } from '../sdk'
 import { versionGraph } from '../versions'
-import { fixOnionTargets } from './fixOnionTargets'
 import { migrateOnionAddresses } from './migrateOnionAddresses'
 import { reloadTorrc } from './reloadTorrc'
 import { seedFiles } from './seedFiles'
@@ -19,7 +18,6 @@ export const init = sdk.setupInit(
   actions,
   registerUrlPlugin,
   migrateOnionAddresses,
-  fixOnionTargets,
   exportUrls,
   reloadTorrc,
 )
