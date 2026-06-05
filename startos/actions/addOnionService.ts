@@ -206,29 +206,18 @@ export const addOnionService = sdk.Action.withInput(
           internalPort: 80,
         }
       } else if (binding?.enabled) {
-        // Target the static lxcbr0 ipv4 gateway forward. Tor resolves a
-        // HiddenServicePort target hostname only once, at config-parse time,
-        // and caches the result as a literal IP (hs_port_config_t.real_addr);
-        // it never re-resolves. The gateway IP is static and StartOS DNATs
-        // it to the live container, so there is nothing for tor to cache
-        // stale. A binding exposes a plaintext (`ssl: false`) lxcbr0 entry
-        // only when it actually serves plaintext on the host; an SSL-only
-        // binding (addSsl, or native `secure.ssl`) has none. A non-SSL onion
-        // has no honest target there, so refuse rather than wrap it in TLS.
-        const plaintext = binding.addresses.available.find(
-          (a) =>
-            a.metadata.kind === 'ipv4' &&
-            a.metadata.gateway === 'lxcbr0' &&
-            !a.ssl &&
-            a.port !== null,
-        )
-        if (!plaintext) {
+        // A binding that terminates its own TLS (native `secure.ssl`) has no
+        // plaintext endpoint, so a non-SSL onion can't honestly serve it.
+        if (binding.options.secure?.ssl === true) {
           throw new Error(
-            `Cannot create a non-SSL onion service for "${packageId}": its interface exposes no plaintext endpoint (it is SSL-only). Create an SSL onion service instead, or have the package expose a plaintext port.`,
+            `Cannot create a non-SSL onion service for "${packageId}": its interface is SSL-only. Create an SSL onion service instead.`,
           )
         }
+        // TODO(beta.10): switch to the static lxcbr0 plaintext gateway target
+        // once StartOS surfaces it; the container hostname is stale-prone (tor
+        // caches the resolved IP for the life of the config).
         newPorts[String(binding.options.preferredExternalPort)] = {
-          target: `${plaintext.hostname}:${plaintext.port}`,
+          target: `${defaultHost}:${internalPort}`,
           ssl: false,
           internalPort,
         }

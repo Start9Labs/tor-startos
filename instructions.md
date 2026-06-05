@@ -14,7 +14,7 @@
 
 ### Adding a .onion address to another service
 
-Open the specific interface of the other service you want to expose over Tor. On that interface's page you'll find a **Tor** table; from there you can add or remove hidden services for that interface. When adding one you can supply a base64 ed25519 expanded private key for a vanity address, or leave that blank and StartOS will generate a fresh key. The `.onion` lives with the interface you attached it to — it appears and disappears with that interface. If an interface only serves over SSL, the onion is created as SSL too; you cannot attach a non-SSL onion to an SSL-only interface (there would be no plaintext endpoint to forward to).
+Open the specific interface of the other service you want to expose over Tor. On that interface's page you'll find a **Tor** table; from there you can add or remove hidden services for that interface. When adding one you can supply a base64 ed25519 expanded private key for a vanity address, or leave that blank and StartOS will generate a fresh key. The `.onion` lives with the interface you attached it to — it appears and disappears with that interface. You can add an SSL or a non-SSL onion; an interface that terminates its own TLS (SSL-only) can only take an SSL onion, since it has no plaintext endpoint to forward to.
 
 ### Running a relay or bridge
 
