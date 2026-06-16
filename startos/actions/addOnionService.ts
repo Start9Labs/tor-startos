@@ -172,19 +172,36 @@ export const addOnionService = sdk.Action.withInput(
     const host = iface?.host
     const binding = host?.bindings[internalPort]
 
-    // Build port entry: either SSL or non-SSL based on toggle
+    // A binding that terminates its own TLS (native `secure.ssl`) is SSL-only:
+    // it has no plaintext endpoint, so the only honest onion is an SSL one. Such
+    // a binding shows no SSL toggle (the toggle is offered only for `addSsl`
+    // bindings, which expose both a plaintext and a StartOS-terminated SSL
+    // port), so `input.ssl` is absent — infer SSL from the binding itself.
+    const nativeSsl = binding?.options.secure?.ssl === true
+    const ssl = !!input.ssl || nativeSsl
+
+    // Build port entry: either SSL or non-SSL based on the resolved `ssl` flag
     const newPorts: Record<
       string,
       { target: string; ssl: boolean; internalPort: number }
     > = {}
 
-    if (input.ssl && packageId === 'STARTOS') {
+    if (ssl && packageId === 'STARTOS') {
       newPorts['443'] = {
         target: `${defaultHost}:443`,
         ssl: true,
         internalPort: 80,
       }
-    } else if (input.ssl && binding?.options.addSsl) {
+    } else if (ssl && nativeSsl && binding?.enabled) {
+      // The service speaks TLS on `internalPort` itself, so Tor forwards raw TCP
+      // straight to it — there is no StartOS-terminated SSL port to target the
+      // way an `addSsl` binding has.
+      newPorts[String(binding.options.preferredExternalPort)] = {
+        target: `${defaultHost}:${internalPort}`,
+        ssl: true,
+        internalPort,
+      }
+    } else if (ssl && binding?.options.addSsl) {
       const sslAddr = binding.addresses.available.find(
         (a) =>
           a.ssl &&
@@ -206,13 +223,6 @@ export const addOnionService = sdk.Action.withInput(
           internalPort: 80,
         }
       } else if (binding?.enabled) {
-        // A binding that terminates its own TLS (native `secure.ssl`) has no
-        // plaintext endpoint, so a non-SSL onion can't honestly serve it.
-        if (binding.options.secure?.ssl === true) {
-          throw new Error(
-            `Cannot create a non-SSL onion service for "${packageId}": its interface is SSL-only. Create an SSL onion service instead.`,
-          )
-        }
         // TODO(beta.10): switch to the static lxcbr0 plaintext gateway target
         // once StartOS surfaces it; the container hostname is stale-prone (tor
         // caches the resolved IP for the life of the config).
@@ -240,11 +250,11 @@ export const addOnionService = sdk.Action.withInput(
       const existing = services[address.selection]
       if (existing) {
         const duplicate = Object.values(existing.ports).some(
-          (p) => p?.ssl === !!input.ssl && p?.internalPort === internalPort,
+          (p) => p?.ssl === ssl && p?.internalPort === internalPort,
         )
         if (duplicate) {
           throw new Error(
-            input.ssl
+            ssl
               ? i18n(
                   'This onion address already has an SSL binding for this port',
                 )
