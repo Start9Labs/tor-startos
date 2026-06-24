@@ -1,23 +1,53 @@
 import { VersionInfo, IMPOSSIBLE } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '0.4.9.9:2',
+  version: '0.4.9.10:0',
   releaseNotes: {
-    en_US: `**Fixes**
+    en_US: `Updated Tor to 0.4.9.10.
 
-- Fixed onion-service creation for SSL-native interfaces (those that terminate their own TLS, e.g. SimpleX SMP/XFTP and Core Lightning's gRPC), which wrongly failed with "…its interface is SSL-only. Create an SSL onion service instead." The onion now forwards straight to the service's own TLS port.`,
-    es_ES: `**Correcciones**
+Security release — upgrading is strongly recommended.
 
-- Se corrigió la creación de servicios onion para interfaces nativas de SSL (las que terminan su propio TLS, p. ej. SMP/XFTP de SimpleX y el gRPC de Core Lightning), que fallaba por error con «…su interfaz es solo SSL. Cree un servicio onion SSL en su lugar.» Ahora el onion reenvía directamente al puerto TLS del propio servicio.`,
-    de_DE: `**Korrekturen**
+- Fixes a use-after-free triggered by a malicious conflux client (TROVE-2026-025).
+- Restores warnings about unsafe SOCKS protocols when SafeSocks is not set.
+- Expires entry guards more consistently (48–60 days) and fixes assorted client/relay bugs.
 
-- Onion-Dienst-Erstellung für SSL-native Schnittstellen behoben (die ihr eigenes TLS terminieren, z. B. SimpleX SMP/XFTP und das gRPC von Core Lightning); diese schlug fälschlicherweise mit „…ihre Schnittstelle ist ausschließlich SSL. Erstellen Sie stattdessen einen SSL-Onion-Dienst." fehl. Der Onion leitet nun direkt an den TLS-Port des Dienstes weiter.`,
-    pl_PL: `**Poprawki**
+Full changelog: https://gitlab.torproject.org/tpo/core/tor/-/raw/tor-0.4.9.10/ChangeLog`,
+    es_ES: `Se actualizó Tor a 0.4.9.10.
 
-- Naprawiono tworzenie usług onion dla interfejsów natywnie obsługujących SSL (tych, które same kończą TLS, np. SMP/XFTP SimpleX oraz gRPC Core Lightning), które błędnie kończyło się komunikatem „…ten interfejs obsługuje wyłącznie SSL. Utwórz usługę onion z SSL." Onion przekazuje teraz ruch bezpośrednio do portu TLS samej usługi.`,
-    fr_FR: `**Corrections**
+Versión de seguridad: se recomienda encarecidamente actualizar.
 
-- Correction de la création de services onion pour les interfaces nativement SSL (celles qui terminent leur propre TLS, p. ex. SMP/XFTP de SimpleX et le gRPC de Core Lightning), qui échouait à tort avec « …son interface est exclusivement SSL. Créez plutôt un service onion SSL. » L'onion redirige désormais directement vers le port TLS du service lui-même.`,
+- Corrige un uso después de liberar provocado por un cliente conflux malicioso (TROVE-2026-025).
+- Restaura las advertencias sobre protocolos SOCKS inseguros cuando SafeSocks no está configurado.
+- Expira los guardias de entrada de forma más consistente (48–60 días) y corrige varios errores de cliente/repetidor.
+
+Registro de cambios completo: https://gitlab.torproject.org/tpo/core/tor/-/raw/tor-0.4.9.10/ChangeLog`,
+    de_DE: `Tor auf 0.4.9.10 aktualisiert.
+
+Sicherheits-Release – ein Upgrade wird dringend empfohlen.
+
+- Behebt eine Use-after-free-Lücke, die von einem bösartigen Conflux-Client ausgelöst wird (TROVE-2026-025).
+- Stellt Warnungen vor unsicheren SOCKS-Protokollen wieder her, wenn SafeSocks nicht gesetzt ist.
+- Lässt Entry-Guards konsistenter ablaufen (48–60 Tage) und behebt diverse Client-/Relay-Fehler.
+
+Vollständiges Änderungsprotokoll: https://gitlab.torproject.org/tpo/core/tor/-/raw/tor-0.4.9.10/ChangeLog`,
+    pl_PL: `Zaktualizowano Tor do 0.4.9.10.
+
+Wydanie zabezpieczające — zdecydowanie zalecana aktualizacja.
+
+- Naprawia użycie po zwolnieniu pamięci wywoływane przez złośliwego klienta conflux (TROVE-2026-025).
+- Przywraca ostrzeżenia o niebezpiecznych protokołach SOCKS, gdy SafeSocks nie jest ustawione.
+- Bardziej konsekwentnie wygasza strażników wejściowych (48–60 dni) oraz naprawia różne błędy klienta/przekaźnika.
+
+Pełny dziennik zmian: https://gitlab.torproject.org/tpo/core/tor/-/raw/tor-0.4.9.10/ChangeLog`,
+    fr_FR: `Tor mis à jour vers 0.4.9.10.
+
+Version de sécurité — la mise à niveau est fortement recommandée.
+
+- Corrige une utilisation après libération déclenchée par un client conflux malveillant (TROVE-2026-025).
+- Rétablit les avertissements concernant les protocoles SOCKS non sécurisés lorsque SafeSocks n'est pas défini.
+- Expire les gardes d'entrée de manière plus cohérente (48–60 jours) et corrige divers bogues client/relais.
+
+Journal des modifications complet : https://gitlab.torproject.org/tpo/core/tor/-/raw/tor-0.4.9.10/ChangeLog`,
   },
   migrations: {
     up: async ({ effects }) => {},
