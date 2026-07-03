@@ -41,12 +41,7 @@ const inputSpec = InputSpec.of({
   }),
 }).add(({ Value }) => ({
   address: Value.dynamicUnion(async ({ prefill }) => {
-    const {
-      packageId: rawPkgId,
-      hostId,
-      internalPort,
-    } = prefill?.urlPluginMetadata ?? {}
-    const packageId = rawPkgId ?? 'STARTOS'
+    const { packageId, hostId, internalPort } = prefill?.urlPluginMetadata ?? {}
 
     const config = await torrc.read().once()
     const entries =
@@ -146,28 +141,18 @@ export const addOnionService = sdk.Action.withInput(
 
   // execution
   async ({ effects, input }) => {
-    const {
-      packageId: rawPkgId,
-      hostId,
-      interfaceId,
-      internalPort,
-    } = input.urlPluginMetadata
-    const packageId = rawPkgId ?? 'STARTOS'
+    const { packageId, hostId, interfaceId, internalPort } =
+      input.urlPluginMetadata
     const address = input.address as {
       selection: string
       value: { privateKey?: string | null }
     }
 
-    const defaultHost =
-      packageId === 'STARTOS' ? 'startos' : `${packageId}.startos`
+    const defaultHost = `${packageId}.startos`
 
-    // Look up the binding for this internalPort (STARTOS has no service interface)
-    const iface =
-      packageId !== 'STARTOS'
-        ? await sdk.serviceInterface
-            .get(effects, { packageId, id: interfaceId })
-            .once()
-        : null
+    const iface = await sdk.serviceInterface
+      .get(effects, { packageId, id: interfaceId })
+      .once()
 
     const host = iface?.host
     const binding = host?.bindings[internalPort]
@@ -186,13 +171,7 @@ export const addOnionService = sdk.Action.withInput(
       { target: string; ssl: boolean; internalPort: number }
     > = {}
 
-    if (ssl && packageId === 'STARTOS') {
-      newPorts['443'] = {
-        target: `${defaultHost}:443`,
-        ssl: true,
-        internalPort: 80,
-      }
-    } else if (ssl && nativeSsl && binding?.enabled) {
+    if (ssl && nativeSsl && binding?.enabled) {
       // The service speaks TLS on `internalPort` itself, so Tor forwards raw TCP
       // straight to it — there is no StartOS-terminated SSL port to target the
       // way an `addSsl` binding has.
@@ -216,13 +195,7 @@ export const addOnionService = sdk.Action.withInput(
         }
       }
     } else {
-      if (packageId === 'STARTOS') {
-        newPorts['80'] = {
-          target: `${defaultHost}:80`,
-          ssl: false,
-          internalPort: 80,
-        }
-      } else if (binding?.enabled) {
+      if (binding?.enabled) {
         // TODO(beta.10): switch to the static lxcbr0 plaintext gateway target
         // once StartOS surfaces it; the container hostname is stale-prone (tor
         // caches the resolved IP for the life of the config).

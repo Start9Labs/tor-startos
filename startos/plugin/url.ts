@@ -19,16 +19,24 @@ export const exportUrls = sdk.plugin.url.setupExportedUrls(
     const removed: string[] = []
 
     for (const [packageId, hosts] of Object.entries(cleaned)) {
-      if (packageId === 'STARTOS' || !hosts) continue
+      if (!hosts) continue
 
-      const hostIds = await sdk.serviceInterface
-        .getAll(
-          effects,
-          { packageId },
-          (ifaces) =>
-            new Set(ifaces.map((i) => i.addressInfo?.hostId).filter(Boolean)),
-        )
-        .const()
+      // Prune only on a confirmed-empty answer; a failed lookup (e.g. a legacy
+      // entry the OS can't resolve) keeps the entry and its key material.
+      let hostIds: Set<string | undefined>
+      try {
+        hostIds = await sdk.serviceInterface
+          .getAll(
+            effects,
+            { packageId },
+            (ifaces) =>
+              new Set(ifaces.map((i) => i.addressInfo?.hostId).filter(Boolean)),
+          )
+          .const()
+      } catch (e) {
+        console.warn(`Skipping cleanup for ${packageId}: ${e}`)
+        continue
+      }
 
       for (const [hostId, services] of Object.entries(hosts)) {
         if (!hostIds.has(hostId)) {
@@ -86,7 +94,7 @@ export const exportUrls = sdk.plugin.url.setupExportedUrls(
             await sdk.plugin.url
               .exportUrl(effects, {
                 hostnameInfo: {
-                  packageId: packageId === 'STARTOS' ? null : packageId,
+                  packageId,
                   hostId,
                   internalPort: portInfo.internalPort,
                   ssl: portInfo.ssl,

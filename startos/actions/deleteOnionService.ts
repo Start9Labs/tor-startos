@@ -8,7 +8,7 @@ const { InputSpec, Value } = sdk
 const inputSpec = InputSpec.of({
   urlPluginMetadata: Value.hidden<{
     interfaceId: string
-    packageId: string | null
+    packageId: string
     hostId: string
     internalPort: number
     ssl: boolean
@@ -41,9 +41,7 @@ export const deleteOnionService = sdk.Action.withInput(
 
   // execution
   async ({ effects, input }) => {
-    const { packageId: rawPkgId, hostId, hostname, port, ssl } =
-      input.urlPluginMetadata
-    const packageId = rawPkgId ?? 'STARTOS'
+    const { packageId, hostId, hostname, port, ssl } = input.urlPluginMetadata
 
     const config = await torrc.read().once()
     const onionServices = structuredClone(config?.onionServices || {})
