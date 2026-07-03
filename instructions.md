@@ -6,9 +6,14 @@
 
 ## What you get on StartOS
 
-- A running Tor daemon with a **SOCKS5 proxy** at `tor.startos:9050` that other StartOS services use to reach `.onion` destinations.
+- A running Tor daemon with a **SOCKS5 proxy** on port 9050 that other StartOS services reach over the internal bridge to connect to `.onion` destinations.
 - The ability to **add a `.onion` address to any interface of any other installed service**, optionally with your own vanity key.
 - Optional **relay or bridge mode** to contribute capacity to the Tor network.
+
+## Requirements & upgrade notes
+
+- **StartOS 0.4.0-beta.10 or later is required.** Onion services now reach their target apps over StartOS's internal LXC bridge instead of deprecated container hostnames, and the StartOS admin UI is addressed like any other service — both need the beta.10 backend. A side benefit: installing, updating, or removing Tor no longer restarts the services that depend on it (e.g. Bitcoin).
+- **Uninstalling Tor permanently deletes all onion service keys and `.onion` addresses.** Any service reachable through one of those addresses will lose it. Make a backup first if you want to keep your addresses.
 
 ## Using Tor
 

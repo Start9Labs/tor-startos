@@ -1,13 +1,13 @@
 import { VersionInfo, IMPOSSIBLE } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '0.4.9.11:1',
+  version: '0.4.9.11:2',
   releaseNotes: {
-    en_US: `The StartOS admin UI is now handled like any other service (requires StartOS 0.4.0-beta.10, which renames the existing entry and preserves your .onion address). Cleanup of stale onion entries is now more careful: an entry is only removed when its service confirmably no longer exists.`,
-    es_ES: `La interfaz de administración de StartOS ahora se gestiona como cualquier otro servicio (requiere StartOS 0.4.0-beta.10, que renombra la entrada existente y conserva su dirección .onion). La limpieza de entradas onion obsoletas ahora es más cuidadosa: una entrada solo se elimina cuando se confirma que su servicio ya no existe.`,
-    de_DE: `Die StartOS-Verwaltungsoberfläche wird jetzt wie jeder andere Dienst behandelt (erfordert StartOS 0.4.0-beta.10, das den bestehenden Eintrag umbenennt und Ihre .onion-Adresse erhält). Die Bereinigung veralteter Onion-Einträge ist jetzt vorsichtiger: Ein Eintrag wird nur entfernt, wenn sein Dienst nachweislich nicht mehr existiert.`,
-    pl_PL: `Interfejs administracyjny StartOS jest teraz obsługiwany jak każda inna usługa (wymaga StartOS 0.4.0-beta.10, który zmienia nazwę istniejącego wpisu i zachowuje Twój adres .onion). Czyszczenie nieaktualnych wpisów onion jest teraz ostrożniejsze: wpis jest usuwany tylko wtedy, gdy potwierdzono, że jego usługa już nie istnieje.`,
-    fr_FR: `L'interface d'administration de StartOS est désormais gérée comme n'importe quel autre service (nécessite StartOS 0.4.0-beta.10, qui renomme l'entrée existante et préserve votre adresse .onion). Le nettoyage des entrées onion obsolètes est désormais plus prudent : une entrée n'est supprimée que lorsqu'il est confirmé que son service n'existe plus.`,
+    en_US: `Updated to the StartOS 2.0 SDK. Onion services now reach their target apps over the internal LXC bridge instead of deprecated container hostnames — this repairs onion address routing and stops other services (e.g. Bitcoin) from restarting whenever Tor is installed, updated, or removed.`,
+    es_ES: `Actualizado al SDK 2.0 de StartOS. Los servicios onion ahora alcanzan sus aplicaciones de destino a través del puente LXC interno en lugar de nombres de host de contenedor obsoletos: esto repara el enrutamiento de direcciones onion y evita que otros servicios (por ejemplo, Bitcoin) se reinicien cada vez que se instala, actualiza o elimina Tor.`,
+    de_DE: `Auf das StartOS-2.0-SDK aktualisiert. Onion-Dienste erreichen ihre Ziel-Apps jetzt über die interne LXC-Bridge statt über veraltete Container-Hostnamen — das repariert das Routing von Onion-Adressen und verhindert, dass andere Dienste (z. B. Bitcoin) neu starten, wenn Tor installiert, aktualisiert oder entfernt wird.`,
+    pl_PL: `Zaktualizowano do SDK StartOS 2.0. Usługi onion docierają teraz do docelowych aplikacji przez wewnętrzny mostek LXC zamiast przestarzałych nazw hostów kontenerów — naprawia to routing adresów onion i zapobiega restartowaniu innych usług (np. Bitcoin) przy każdej instalacji, aktualizacji lub usunięciu Tora.`,
+    fr_FR: `Mise à jour vers le SDK StartOS 2.0. Les services onion atteignent désormais leurs applications cibles via le pont LXC interne au lieu de noms d'hôtes de conteneurs obsolètes — cela répare le routage des adresses onion et empêche d'autres services (par ex. Bitcoin) de redémarrer chaque fois que Tor est installé, mis à jour ou supprimé.`,
   },
   migrations: {
     up: async ({ effects }) => {},

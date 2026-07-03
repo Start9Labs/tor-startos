@@ -1,4 +1,4 @@
-import type { HealthCheckResult } from '@start9labs/start-sdk/package/lib/health/checkFns'
+import type { HealthCheckResult } from '@start9labs/start-sdk/lib/health/checkFns'
 import { connect } from 'node:net'
 import { i18n } from './i18n'
 import { sdk } from './sdk'
@@ -6,7 +6,7 @@ import { sdk } from './sdk'
 export const main = sdk.setupMain(async ({ effects }) => {
   console.info('Starting Tor!')
 
-  const torSub = await sdk.SubContainer.of(
+  const torSub = sdk.SubContainer.of(
     effects,
     { imageId: 'tor' },
     sdk.Mounts.of().mountVolume({

@@ -1,7 +1,7 @@
 import { hsDir, nextKey, torrc } from '../fileModels/torrc'
 import { i18n } from '../i18n'
 import { sdk } from '../sdk'
-import { generateOnionFiles } from '../utils'
+import { bridgeHost, generateOnionFiles } from '../utils'
 
 const { InputSpec, Value, Variants } = sdk
 
@@ -115,17 +115,16 @@ export const addOnionService = sdk.Action.withInput(
     const p = prefill as typeof inputSpec._PARTIAL
     let noSsl = false
 
-    if (p?.urlPluginMetadata?.packageId && p.urlPluginMetadata.interfaceId) {
-      const iface = await sdk.serviceInterface
-        .get(effects, {
-          packageId: p?.urlPluginMetadata?.packageId,
-          id: p.urlPluginMetadata.interfaceId,
-        })
+    const meta = p?.urlPluginMetadata
+    if (meta?.packageId && meta.hostId && meta.internalPort != null) {
+      const internalPort = meta.internalPort
+      noSsl = await sdk.host
+        .get(
+          effects,
+          { hostId: meta.hostId, packageId: meta.packageId },
+          (host) => !host?.bindings[internalPort]?.options.addSsl,
+        )
         .once()
-      if (iface?.addressInfo?.internalPort) {
-        noSsl =
-          !iface?.host?.bindings[iface.addressInfo?.internalPort].options.addSsl
-      }
     }
 
     return inputSpec.filter(
@@ -141,20 +140,13 @@ export const addOnionService = sdk.Action.withInput(
 
   // execution
   async ({ effects, input }) => {
-    const { packageId, hostId, interfaceId, internalPort } =
-      input.urlPluginMetadata
+    const { packageId, hostId, internalPort } = input.urlPluginMetadata
     const address = input.address as {
       selection: string
       value: { privateKey?: string | null }
     }
 
-    const defaultHost = `${packageId}.startos`
-
-    const iface = await sdk.serviceInterface
-      .get(effects, { packageId, id: interfaceId })
-      .once()
-
-    const host = iface?.host
+    const host = await sdk.host.get(effects, { hostId, packageId }).once()
     const binding = host?.bindings[internalPort]
 
     // A binding that terminates its own TLS (native `secure.ssl`) is SSL-only:
@@ -165,44 +157,45 @@ export const addOnionService = sdk.Action.withInput(
     const nativeSsl = binding?.options.secure?.ssl === true
     const ssl = !!input.ssl || nativeSsl
 
-    // Build port entry: either SSL or non-SSL based on the resolved `ssl` flag
+    // Build the port entry. The target is always the interface's LXC-bridge
+    // `host:port` (the deprecated `<pkg>.startos` container hostname is gone);
+    // the bridge exposes an http and an https variant, and we pick by `ssl`.
     const newPorts: Record<
       string,
       { target: string; ssl: boolean; internalPort: number }
     > = {}
 
     if (ssl && nativeSsl && binding?.enabled) {
-      // The service speaks TLS on `internalPort` itself, so Tor forwards raw TCP
-      // straight to it — there is no StartOS-terminated SSL port to target the
-      // way an `addSsl` binding has.
-      newPorts[String(binding.options.preferredExternalPort)] = {
-        target: `${defaultHost}:${internalPort}`,
-        ssl: true,
-        internalPort,
+      // The service speaks TLS on its own port, so Tor forwards raw TCP to the
+      // bridge's https address for it.
+      const addr = bridgeHost(host, internalPort, true)
+      if (addr) {
+        newPorts[String(binding.options.preferredExternalPort)] = {
+          target: `${addr.hostname}:${addr.port}`,
+          ssl: true,
+          internalPort,
+        }
       }
     } else if (ssl && binding?.options.addSsl) {
-      const sslAddr = binding.addresses.available.find(
-        (a) =>
-          a.ssl &&
-          a.metadata.kind === 'ipv4' &&
-          a.metadata.gateway === 'lxcbr0',
-      )
-      if (sslAddr && sslAddr.port !== null) {
+      // StartOS terminates TLS on the bridge's https port and forwards
+      // plaintext to the container; the onion targets that port.
+      const addr = bridgeHost(host, internalPort, true)
+      if (addr) {
         newPorts[String(binding.options.addSsl.preferredExternalPort)] = {
-          target: `${sslAddr.hostname}:${sslAddr.port}`,
+          target: `${addr.hostname}:${addr.port}`,
           ssl: true,
           internalPort,
         }
       }
     } else {
       if (binding?.enabled) {
-        // TODO(beta.10): switch to the static lxcbr0 plaintext gateway target
-        // once StartOS surfaces it; the container hostname is stale-prone (tor
-        // caches the resolved IP for the life of the config).
-        newPorts[String(binding.options.preferredExternalPort)] = {
-          target: `${defaultHost}:${internalPort}`,
-          ssl: false,
-          internalPort,
+        const addr = bridgeHost(host, internalPort, false)
+        if (addr) {
+          newPorts[String(binding.options.preferredExternalPort)] = {
+            target: `${addr.hostname}:${addr.port}`,
+            ssl: false,
+            internalPort,
+          }
         }
       } else {
         throw new Error(
