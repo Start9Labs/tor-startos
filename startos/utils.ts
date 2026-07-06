@@ -5,6 +5,15 @@ import { bytesToNumberLE } from '@noble/curves/utils.js'
 import { base32 } from 'rfc4648'
 
 /**
+ * The SOCKS5 proxy binding. Bound without an exported interface, so it is
+ * reachable only on lo/lxcbr0 — dependents dial the stable bridge address
+ * `${await sdk.getOsIp(effects)}:${socksPort}` (10.0.3.1:9050), never the
+ * LAN. Import these instead of hardcoding.
+ */
+export const socksHostId = 'socks'
+export const socksPort = 9050
+
+/**
  * The IPv4 LXC-bridge `{ hostname, port }` for the interface on a binding of an
  * already-resolved host. `<pkg>.startos` DNS and container IPs are deprecated;
  * containers — and the OS admin UI (`start-os`/`admin`) — are reached over this

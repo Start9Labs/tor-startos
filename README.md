@@ -107,7 +107,12 @@ There is no upstream configuration UI.
 - **Port:** 9050
 - **Protocol:** SOCKS5
 - **Purpose:** Private browsing proxy for other services on the network
-- **Binding:** `0.0.0.0:9050` (accessible to all services on the StartOS network)
+- **Binding:** StartOS host binding on port 9050 with **no exported interface**,
+  so it is reachable only on the internal LXC bridge — other services dial the
+  stable address `10.0.3.1:9050` (`await sdk.getOsIp(effects)` + the `socksPort`
+  const exported from `startos/utils.ts`), never the LAN. Because the address
+  never changes, dependents need no reactive watch on Tor and do not restart
+  when Tor is installed, updated, or removed.
 
 ### Relay OR Port (conditional)
 
