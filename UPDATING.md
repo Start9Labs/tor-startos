@@ -10,22 +10,33 @@ Canonical home: <https://gitlab.torproject.org/tpo/core/tor>. Latest stable tag:
 
 ```
 curl -fsSL 'https://gitlab.torproject.org/api/v4/projects/tpo%2Fcore%2Ftor/repository/tags?per_page=20' \
-  | jq -r '.[].name' | grep -E '^tor-[0-9]+\.[0-9]+\.[0-9]+$' | head -n1
+  | jq -r '.[].name' | grep -E '^tor-[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -n1
 ```
+
+Note the **four** version components — Tor versions are `0.4.9.11`, not `0.4.9`. A three-component regex matches nothing and the command silently prints an empty line. The filter also drops the `-alpha` / `-rc` / `-alpha-dev` tags, which are interleaved with the stable ones in the tag list; only a bare four-component tag is a stable release.
 
 No version is pinned in this repo — there is no Tor tag, ARG, or `TOR_VERSION` variable to read. Use this only to know what the newest stable Tor is so you can compare against what Alpine ships (next section).
 
 ### Tor as packaged by Alpine (what actually ships)
 
-Tor is pulled in by `RUN apk add --no-cache tor` against the Alpine tag in the `Dockerfile`. To see which Tor version that resolves to for the currently pinned Alpine release, query the Alpine package index:
+Tor is pulled in by `RUN apk add --no-cache tor` against the Alpine tag in the `Dockerfile`. **`tor` lives in Alpine's `community` repository, not `main`.** To see which Tor version that resolves to for the currently pinned Alpine release, read the authoritative package index (`APKINDEX`) for that release:
 
 ```
 ALPINE_TAG=$(grep -oP '(?<=^FROM alpine:)[0-9.]+' Dockerfile)
-curl -fsSL "https://pkgs.alpinelinux.org/package/v${ALPINE_TAG}/main/x86_64/tor" \
-  | grep -oP '(?<=<th class="header">Version</th>\s<td>)[^<]+' | head -n1
+curl -fsSL "https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_TAG}/community/x86_64/APKINDEX.tar.gz" \
+  | tar -xzO APKINDEX | grep -A1 '^P:tor$'
 ```
 
-(Or browse <https://pkgs.alpinelinux.org/packages?name=tor&branch=v${ALPINE_TAG}&arch=x86_64> directly.) That is the Tor version a fresh build will install. The pin lives implicitly in the Alpine base tag, not in a Tor-specific variable.
+That prints `P:tor` / `V:<version>-r<rev>` — the exact version a fresh build will install. Equivalently, ask `apk` itself inside the base image:
+
+```
+docker run --rm alpine:${ALPINE_TAG} sh -c 'apk update -q && apk search -e tor'
+```
+
+The pin lives implicitly in the Alpine base tag, not in a Tor-specific variable.
+
+> [!NOTE]
+> The human-readable package browser lives at `https://pkgs.alpinelinux.org/package/v${ALPINE_TAG}/community/x86_64/tor` — note **`community`** in the path; the `main` path 404s, which is what made the old scrape in this doc fail. Don't scrape it either way: its HTML has since changed, so version-extracting `grep`s against it now come back empty rather than erroring. Use the `APKINDEX` or `apk` queries above.
 
 ### Alpine base image
 
