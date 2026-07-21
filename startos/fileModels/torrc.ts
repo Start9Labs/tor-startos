@@ -1,5 +1,6 @@
 import { FileHelper, z } from '@start9labs/start-sdk'
 import { sdk } from '../sdk'
+import { socksPort } from '../utils'
 
 const portInfoShape = z.object({
   target: z.string(),
@@ -79,7 +80,7 @@ export function nextKey(record: Record<string, unknown>): string {
  */
 function toFile(config: TorrcConfig): string {
   const lines: string[] = [
-    'SocksPort 0.0.0.0:9050',
+    `SocksPort 0.0.0.0:${socksPort}`,
     'DataDirectory /var/lib/tor',
     'ControlSocket /var/lib/tor/control.sock',
     '',

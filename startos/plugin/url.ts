@@ -1,4 +1,4 @@
-import { FileHelper } from '@start9labs/start-sdk'
+import { FileHelper, utils } from '@start9labs/start-sdk'
 import { rm } from 'fs/promises'
 import { addOnionService } from '../actions/addOnionService'
 import { deleteOnionService } from '../actions/deleteOnionService'
@@ -21,35 +21,30 @@ export const exportUrls = sdk.plugin.url.setupExportedUrls(
     for (const [packageId, hosts] of Object.entries(cleaned)) {
       if (!hosts) continue
 
-      // Prune only on a confirmed-empty answer; a failed lookup (e.g. a legacy
-      // entry the OS can't resolve) keeps the entry and its key material.
-      let hostIds: Set<string | undefined>
-      try {
-        hostIds = await sdk.serviceInterface
-          .getAll(
-            effects,
-            { packageId },
-            (ifaces) =>
-              new Set(ifaces.map((i) => i.addressInfo?.hostId).filter(Boolean)),
-          )
-          .const()
-      } catch (e) {
-        console.warn(`Skipping cleanup for ${packageId}: ${e}`)
-        continue
-      }
-
       for (const [hostId, services] of Object.entries(hosts)) {
-        if (!hostIds.has(hostId)) {
-          for (const index of Object.keys(services ?? {})) {
-            await rm(sdk.volumes.tor.subpath(hsDir(packageId, hostId, index)), {
-              recursive: true,
-              force: true,
-            })
-          }
-          // Set to undefined (not delete) so merge() removes the key from the file
-          ;(cleaned[packageId] as any)[hostId] = undefined
-          removed.push(`${packageId}/${hostId}`)
+        // Prune only on a confirmed-gone host. `sdk.host.get` returns null when
+        // the host no longer exists; a thrown lookup (e.g. a legacy entry the
+        // OS can't resolve) keeps the entry and its key material.
+        let host: utils.FilledHost | null
+        try {
+          host = await sdk.host.get(effects, { hostId, packageId }).const()
+        } catch (e) {
+          console.warn(
+            `Skipping cleanup for ${packageId}/${hostId}: ${String(e)}`,
+          )
+          continue
         }
+        if (host) continue // host still exists — keep the onion
+
+        for (const index of Object.keys(services ?? {})) {
+          await rm(sdk.volumes.tor.subpath(hsDir(packageId, hostId, index)), {
+            recursive: true,
+            force: true,
+          })
+        }
+        // Set to undefined (not delete) so merge() removes the key from the file
+        ;(cleaned[packageId] as any)[hostId] = undefined
+        removed.push(`${packageId}/${hostId}`)
       }
 
       if (

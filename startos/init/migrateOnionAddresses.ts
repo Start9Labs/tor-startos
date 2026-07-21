@@ -2,7 +2,7 @@ import { rename } from 'node:fs/promises'
 import { FileHelper, z } from '@start9labs/start-sdk'
 import { sdk } from '../sdk'
 import { hsDir, nextKey, torrc } from '../fileModels/torrc'
-import { generateOnionFiles, isClamped } from '../utils'
+import { bridgeHost, generateOnionFiles, isClamped } from '../utils'
 
 const migrationEntryShape = z.object({
   packageId: z.string(),
@@ -35,48 +35,39 @@ export const migrateOnionAddresses = sdk.setupOnInit(async (effects) => {
     const keyBytes = Buffer.from(key, 'base64')
     if (keyBytes.length < 64 || !isClamped(keyBytes.subarray(0, 32))) continue
 
-    const defaultHost = `${packageId}.startos`
-
-    const hosts = await sdk.serviceInterface
-      .getAll(effects, { packageId }, (ifaces) =>
-        ifaces
-          .filter((i) => i.addressInfo?.hostId === hostId && i.host)
-          .map((i) => i.host!),
-      )
-      .once()
-
-    const host = hosts[0]
-    if (!host) continue // package not installed, skip
+    const host = await sdk.host.get(effects, { hostId, packageId }).once()
+    if (!host) continue // package/host not installed, skip
 
     const ports: Record<
       string,
       { target: string; ssl: boolean; internalPort: number }
     > = {}
-    for (const [internalPort, b] of Object.entries(host.bindings)) {
-      if (b.enabled) {
-        // TODO(beta.10): switch the plaintext target to the static lxcbr0
-        // plaintext gateway endpoint once StartOS surfaces it. Matches
-        // addOnionService.
-        if (b.options.secure?.ssl === true) {
-          // Native-SSL binding: the service terminates its own TLS on its
-          // port, so the onion forwards raw TCP straight to it, flagged ssl.
-          ports[String(b.options.preferredExternalPort)] = {
-            target: `${defaultHost}:${Number(internalPort)}`,
-            ssl: true,
-            internalPort: Number(internalPort),
-          }
-        } else {
-          ports[String(b.options.preferredExternalPort)] = {
-            target: `${defaultHost}:${Number(internalPort)}`,
-            ssl: false,
-            internalPort: Number(internalPort),
-          }
+    for (const [internalPortStr, b] of Object.entries(host.bindings)) {
+      if (!b.enabled) continue
+      const internalPort = Number(internalPortStr)
+
+      // Primary onion port. A native-SSL binding terminates its own TLS, so the
+      // onion forwards raw TCP to it (flagged ssl); everything else is
+      // plaintext. Both reach the target over the LXC bridge — the deprecated
+      // `<pkg>.startos` container hostname is gone.
+      const nativeSsl = b.options.secure?.ssl === true
+      const primary = bridgeHost(host, internalPort, nativeSsl)
+      if (primary) {
+        ports[String(b.options.preferredExternalPort)] = {
+          target: `${primary.hostname}:${primary.port}`,
+          ssl: nativeSsl,
+          internalPort,
         }
-        if (b.options.addSsl) {
+      }
+
+      // addSsl bindings also expose an OS-terminated SSL port over the bridge.
+      if (b.options.addSsl) {
+        const sslAddr = bridgeHost(host, internalPort, true)
+        if (sslAddr) {
           ports[String(b.options.addSsl.preferredExternalPort)] = {
-            target: `startos:${b.net.assignedSslPort}`,
+            target: `${sslAddr.hostname}:${sslAddr.port}`,
             ssl: true,
-            internalPort: Number(internalPort),
+            internalPort,
           }
         }
       }

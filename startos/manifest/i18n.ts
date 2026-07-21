@@ -1,16 +1,4 @@
 export default {
-  alertUninstall: {
-    en_US:
-      'Uninstalling Tor will permanently delete all onion service keys and .onion addresses. Services that depend on these addresses will no longer be reachable over Tor. Please make a backup first if you want to preserve your addresses.',
-    es_ES:
-      'Desinstalar Tor eliminará permanentemente todas las claves de servicios onion y direcciones .onion. Los servicios que dependen de estas direcciones ya no serán accesibles a través de Tor. Haga una copia de seguridad primero si desea preservar sus direcciones.',
-    de_DE:
-      'Die Deinstallation von Tor löscht dauerhaft alle Onion-Dienst-Schlüssel und .onion-Adressen. Dienste, die von diesen Adressen abhängen, sind nicht mehr über Tor erreichbar. Bitte erstellen Sie zuerst ein Backup, wenn Sie Ihre Adressen bewahren möchten.',
-    pl_PL:
-      'Odinstalowanie Tor trwale usunie wszystkie klucze usług onion i adresy .onion. Usługi zależne od tych adresów nie będą już dostępne przez Tor. Wykonaj kopię zapasową, jeśli chcesz zachować swoje adresy.',
-    fr_FR:
-      "La désinstallation de Tor supprimera définitivement toutes les clés de services onion et adresses .onion. Les services qui dépendent de ces adresses ne seront plus accessibles via Tor. Veuillez d'abord effectuer une sauvegarde si vous souhaitez conserver vos adresses.",
-  },
   description: {
     short: {
       en_US: 'Anonymity network for onion services and private browsing',
