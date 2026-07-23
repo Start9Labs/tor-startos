@@ -1,4 +1,4 @@
-import { FileHelper, utils } from '@start9labs/start-sdk'
+import { FileHelper } from '@start9labs/start-sdk'
 import { rm } from 'fs/promises'
 import { addOnionService } from '../actions/addOnionService'
 import { deleteOnionService } from '../actions/deleteOnionService'
@@ -25,16 +25,24 @@ export const exportUrls = sdk.plugin.url.setupExportedUrls(
         // Prune only on a confirmed-gone host. `sdk.host.get` returns null when
         // the host no longer exists; a thrown lookup (e.g. a legacy entry the
         // OS can't resolve) keeps the entry and its key material.
-        let host: utils.FilledHost | null
+        //
+        // Map to existence before `.const()`: Phase 2's `exportUrl` mutates the
+        // target host (its exported-URL set), which this watch observes.
+        // Subscribing to the whole host would re-fire on our own writes and spin
+        // this pass indefinitely; the boolean only flips when a host actually
+        // appears or disappears.
+        let hostExists: boolean
         try {
-          host = await sdk.host.get(effects, { hostId, packageId }).const()
+          hostExists = await sdk.host
+            .get(effects, { hostId, packageId }, (host) => !!host)
+            .const()
         } catch (e) {
           console.warn(
             `Skipping cleanup for ${packageId}/${hostId}: ${String(e)}`,
           )
           continue
         }
-        if (host) continue // host still exists — keep the onion
+        if (hostExists) continue // host still exists — keep the onion
 
         for (const index of Object.keys(services ?? {})) {
           await rm(sdk.volumes.tor.subpath(hsDir(packageId, hostId, index)), {
