@@ -40,13 +40,27 @@ const inputSpec = InputSpec.of({
     default: false,
   }),
 }).add(({ Value }) => ({
-  address: Value.dynamicUnion(async ({ prefill }) => {
+  address: Value.dynamicUnion(async ({ effects, prefill }) => {
     const { packageId, hostId, internalPort } = prefill?.urlPluginMetadata ?? {}
 
     const config = await torrc.read().once()
     const entries =
       (packageId && hostId && config?.onionServices?.[packageId]?.[hostId]) ||
       {}
+
+    // Which onion bindings this interface can serve, mirroring the execution
+    // path: a plaintext primary unless the service terminates its own TLS, plus
+    // an SSL binding when it's native-SSL or StartOS adds SSL.
+    const host =
+      packageId && hostId
+        ? await sdk.host.get(effects, { hostId, packageId }).once()
+        : null
+    const binding =
+      internalPort != null ? host?.bindings[internalPort] : undefined
+    const nativeSsl = binding?.options.secure?.ssl === true
+    const availNonSsl = !!binding?.enabled && !nativeSsl
+    const availSsl =
+      !!binding?.enabled && (nativeSsl || !!binding.options.addSsl)
 
     const variants: Record<
       string,
@@ -59,13 +73,17 @@ const inputSpec = InputSpec.of({
     for (const [key, entry] of Object.entries(entries)) {
       if (!entry || internalPort == null) continue
 
-      // Show address only if it partially serves this binding (has one of SSL/non-SSL but not both)
       const bindingPorts = Object.values(entry.ports).filter(
         (p) => p?.internalPort === internalPort,
       )
       const hasNonSsl = bindingPorts.some((p) => p && !p.ssl)
       const hasSsl = bindingPorts.some((p) => p?.ssl)
-      if (hasNonSsl === hasSsl) continue // skip if has both or neither
+
+      // Skip an address that doesn't serve this binding at all, or one already
+      // attached to every binding the interface offers (non-SSL, plus SSL when
+      // available).
+      if (!hasNonSsl && !hasSsl) continue
+      if ((!availNonSsl || hasNonSsl) && (!availSsl || hasSsl)) continue
 
       let hostname = key
       try {
