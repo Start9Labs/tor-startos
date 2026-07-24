@@ -1,7 +1,7 @@
 import { VersionInfo, IMPOSSIBLE } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '0.4.9.11:3',
+  version: '0.4.9.11:4',
   releaseNotes: {
     en_US: `- Fixes an issue where the Tor service could get stuck at high CPU usage, causing onion address changes to time out.
 - The Add Onion Service dialog now lists an existing .onion address only when the selected interface still has a binding it isn't already attached to (non-SSL, plus SSL when available).`,
