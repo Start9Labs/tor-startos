@@ -41,12 +41,12 @@ Tor relay or bridge to support the network.
 
 ## Image and Container Runtime
 
-| Property      | Value                                         |
-| ------------- | --------------------------------------------- |
+| Property      | Value                                    |
+| ------------- | ---------------------------------------- |
 | Base image    | Alpine Linux with upstream `tor` package |
-| Architectures | x86_64, aarch64, riscv64                      |
-| Entrypoint    | `tor -f /var/lib/tor/torrc`                   |
-| User          | `tor` (non-root)                              |
+| Architectures | x86_64, aarch64, riscv64                 |
+| Entrypoint    | `tor -f /var/lib/tor/torrc`              |
+| User          | `tor` (non-root)                         |
 
 The image is minimal -- just Alpine + the `tor` package. No custom patches
 or modifications to the Tor binary.
@@ -89,14 +89,14 @@ directories itself).
 All configuration is managed through StartOS actions and the URL plugin.
 There is no upstream configuration UI.
 
-| Setting               | Managed By  | Method                                      |
-| --------------------- | ----------- | ------------------------------------------- |
-| Onion services        | URL plugin  | Add/remove via service interface URLs        |
-| Relay/bridge settings | Action      | Configure Relay                              |
-| SOCKS proxy port      | Hardcoded   | Always `0.0.0.0:9050`                       |
-| Data directory        | Hardcoded   | Always `/var/lib/tor`                        |
-| Control socket        | Hardcoded   | `/var/lib/tor/control.sock`                  |
-| Exit relay            | Hardcoded   | Always disabled                              |
+| Setting               | Managed By | Method                                |
+| --------------------- | ---------- | ------------------------------------- |
+| Onion services        | URL plugin | Add/remove via service interface URLs |
+| Relay/bridge settings | Action     | Configure Relay                       |
+| SOCKS proxy port      | Hardcoded  | Always `0.0.0.0:9050`                 |
+| Data directory        | Hardcoded  | Always `/var/lib/tor`                 |
+| Control socket        | Hardcoded  | `/var/lib/tor/control.sock`           |
+| Exit relay            | Hardcoded  | Always disabled                       |
 
 ---
 
@@ -226,7 +226,7 @@ None.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for build instructions and development workflow.
+Build and development workflow follow the StartOS packaging guide: <https://docs.start9.com/packaging>. Keep `README.md`, `instructions.md`, and `AGENTS.md` in sync with any change to user-visible behavior or package structure.
 
 ---
 
