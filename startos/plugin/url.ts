@@ -19,7 +19,7 @@ export const exportUrls = sdk.plugin.url.setupExportedUrls(
     const removed: string[] = []
 
     for (const [packageId, hosts] of Object.entries(cleaned)) {
-      if (!hosts) continue
+      if (packageId === 'STARTOS' || !hosts) continue
 
       for (const [hostId, services] of Object.entries(hosts)) {
         // Prune only on a confirmed-gone host. `sdk.host.get` returns null when
@@ -97,7 +97,7 @@ export const exportUrls = sdk.plugin.url.setupExportedUrls(
             await sdk.plugin.url
               .exportUrl(effects, {
                 hostnameInfo: {
-                  packageId,
+                  packageId: (packageId === 'STARTOS' ? null : packageId) as any,
                   hostId,
                   internalPort: portInfo.internalPort,
                   ssl: portInfo.ssl,
