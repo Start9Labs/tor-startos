@@ -1,4 +1,4 @@
-import { connect } from 'node:net'
+import { reloadConfig } from '../utils/control'
 import { torrc } from '../fileModels/torrc'
 import { sdk } from '../sdk'
 
@@ -33,23 +33,5 @@ export const reloadTorrc = sdk.setupOnInit(async (effects) => {
     },
   )
 
-  await new Promise<void>((resolve) => {
-    const socket = connect(sdk.volumes.tor.subpath('control.sock'))
-
-    socket.setTimeout(5000)
-    socket.on('connect', () => {
-      socket.write('AUTHENTICATE\r\nSIGNAL RELOAD\r\nQUIT\r\n')
-    })
-    socket.on('end', () => {
-      resolve()
-    })
-    socket.on('error', () => {
-      // Control socket not available (Tor not running yet) — ignore
-      resolve()
-    })
-    socket.on('timeout', () => {
-      socket.destroy()
-      resolve()
-    })
-  })
+  await reloadConfig()
 })

@@ -1,10 +1,13 @@
-import type { HealthCheckResult } from '@start9labs/start-sdk/lib/health/checkFns'
-import { connect } from 'node:net'
 import { i18n } from './i18n'
+import { applyPendingWipe, watchdog } from './utils/recovery'
 import { sdk } from './sdk'
 
 export const main = sdk.setupMain(async ({ effects }) => {
   console.info('Starting Tor!')
+
+  // Before any daemon exists, so a queued wipe can't be undone by a running Tor
+  // flushing its in-memory state back to disk.
+  const wipes = await applyPendingWipe(effects)
 
   const torSub = sdk.SubContainer.of(
     effects,
@@ -42,7 +45,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
         },
         ready: {
           display: i18n('Tor SOCKS Proxy'),
-          fn: checkBootstrap,
+          fn: watchdog(effects, wipes),
           // Poll every 1s while bootstrapping. defaultTrigger polls 'loading'
           // only every 30s, so the first "Bootstrapping: 0%" reading stuck for
           // 30s while Tor actually finished — the UI showed 0% long after Tor
@@ -59,46 +62,3 @@ export const main = sdk.setupMain(async ({ effects }) => {
       })
   )
 })
-
-/**
- * Queries Tor's control socket for bootstrap progress.
- * No password is needed — the Unix socket is protected by file permissions (700).
- */
-function checkBootstrap(): Promise<HealthCheckResult> {
-  return new Promise((resolve) => {
-    const socket = connect(sdk.volumes.tor.subpath('control.sock'))
-    let data = ''
-
-    socket.setTimeout(5000)
-    socket.on('connect', () => {
-      socket.write('AUTHENTICATE\r\nGETINFO status/bootstrap-phase\r\nQUIT\r\n')
-    })
-    socket.on('data', (chunk) => {
-      data += chunk.toString()
-    })
-    socket.on('end', () => {
-      const match = data.match(/BOOTSTRAP PROGRESS=(\d+).*?SUMMARY="([^"]*)"/)
-      if (!match) {
-        resolve({ result: 'failure', message: i18n('Tor is not ready') })
-        return
-      }
-      const progress = parseInt(match[1], 10)
-      const summary = match[2]
-      if (progress >= 100) {
-        resolve({ result: 'success', message: i18n('Tor is running') })
-      } else {
-        resolve({
-          result: 'loading',
-          message: `Bootstrapping: ${progress}% - ${summary}`,
-        })
-      }
-    })
-    socket.on('error', () => {
-      resolve({ result: 'failure', message: i18n('Tor is not ready') })
-    })
-    socket.on('timeout', () => {
-      socket.destroy()
-      resolve({ result: 'failure', message: i18n('Tor is not ready') })
-    })
-  })
-}
