@@ -67,9 +67,7 @@ structured data and round-trips cleanly (metadata is embedded as `# @service`,
 
 Onion service keys are stored under
 `/var/lib/tor/hidden_services/<packageId>/<hostId>/hs_<index>/`. The StartOS
-admin UI is addressed like any other service, as `start-os`/`admin` (StartOS
-0.4.0-beta.10 migrates the legacy `STARTOS`/`startos-ui` entries and key
-directories itself).
+admin UI is addressed like any other service, as `start-os`/`admin`.
 
 ---
 
