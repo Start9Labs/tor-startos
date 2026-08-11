@@ -9,6 +9,12 @@ import { base32 } from 'rfc4648'
  * reachable only on lo/lxcbr0 — dependents dial the stable bridge address
  * `${await sdk.getOsIp(effects)}:${socksPort}` (10.0.3.1:9050), never the
  * LAN. Import these instead of hardcoding.
+ *
+ * These two names are a published contract: 16 packaging repos across both
+ * registries import them from `tor-startos/startos/utils`, and nothing in this
+ * repo references them. Renaming either, or moving them off that module path,
+ * breaks all of them with no signal here — `utils/` resolves through its
+ * `index.ts`, so the directory name is load-bearing too.
  */
 export const socksHostId = 'socks'
 export const socksPort = 9050

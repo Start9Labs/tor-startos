@@ -28,6 +28,13 @@ const dict = {
   'Confirm you would like to delete this .onion address': 24,
   'This onion address already has an SSL binding for this port': 25,
   'This onion address already has a non-SSL binding for this port': 26,
+  'Tor is bootstrapped but cannot build circuits': 27,
+  'Tor reset its connection but still cannot connect. Check the server’s internet connection.': 28,
+  'Reset Tor Connection': 29,
+  'Clear the network data Tor has saved and restart it, so it picks new entry nodes. Use this if Tor is stuck connecting or keeps dropping.': 30,
+  'Tor will be offline for a few minutes while it reconnects. Your .onion addresses are not affected.': 31,
+  'Reset Started': 32,
+  'Tor is restarting and will reconnect with new entry nodes. This takes a few minutes.': 33,
 } as const
 
 export type I18nKey = keyof typeof dict
