@@ -6,8 +6,15 @@ Develop it inside a StartOS packaging workspace created by `start-cli s9pk init-
 which provides the packaging guide and agent context one level up. If you're reading this in a
 bare clone with no workspace, the full guide is at <https://docs.start9.com/packaging>.
 
-Work this package's `TODO.md` from top to bottom. Keep `README.md` (architecture, for developers and LLMs) and `instructions.md` (end-user docs) in sync with your changes.
+Work this package's `TODO.md` from top to bottom. Keep `README.md` (technical reference for an AI support or administering agent) and `instructions.md` (end-user docs) in sync with your changes.
 
-## Inspecting a running install
+## This repo
 
-To run a command inside a service's container (read its generated config, grep app logs), use `start-cli package attach <id> -n <subcontainer-name> -- <cmd>`. Select the subcontainer by **name** with `-n` (the name passed to `SubContainer.of` in `main.ts`, e.g. `-n web`) or by image with `-i`. Note: `-s/--subcontainer` matches the internal **Guid**, not the name, so passing a name to `-s` fails with "no matching subcontainers". A service with more than one subcontainer requires a selector; with none given, `attach` falls back to an interactive picker that panics in a non-TTY shell — that's the missing selector, not a TTY requirement.
+- **`socksHostId` and `socksPort` in `startos/utils/` are a published contract.** Sixteen packaging repos across both registries import them from `tor-startos/startos/utils`, and nothing in this repo references them — so renaming either, or moving them off that module path, breaks every dependent with no signal here. `utils/` resolves through its `index.ts`, which makes the directory name load-bearing too.
+- **The wipe must happen in `main` before any daemon is constructed.** A running Tor holds its network state in memory and flushes it on shutdown, so deleting the files underneath it writes the same entry nodes straight back. That is why the wipe is queued to a file and applied at the next start.
+- **`PRESERVE` is an allow-list on purpose.** A wipe that misses a cache file leaves the bad entry node in place — the exact failure being recovered from. Anything new the package persists on the `tor` volume must be added to it.
+- **The watchdog wipes at most once per outage.** Past that the cause is not stale state, and retrying just restarts the service in a loop; the check reports the failure instead.
+- **Any bootstrap-percentage movement resets the stall clock but not the attempt ladder.** Only a healthy reading resets the ladder — otherwise a Tor that crawls forward a percent at a time never escalates.
+- **The `# @service` / `# @ssl` / `# @internalPort` comments in `torrc` are structural.** There is no round-trippable torrc format, so the parser reconstructs package id, host id, and upstream port from them. Stripping them loses that mapping.
+- **Onion-service indexes are never reused after a deletion.** The index is a `HiddenServiceDir` path holding key material; reusing one would put a new service on a stale key directory.
+- **Prune only on a confirmed-gone host.** `sdk.host.get` returning null means gone; a thrown lookup means unknown, and must keep the entry and its keys. Also map to a boolean before `.const()` — subscribing to the whole host re-fires on the export phase's own writes and spins the pass indefinitely.
