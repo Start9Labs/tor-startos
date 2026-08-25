@@ -55,7 +55,7 @@ There are two distinct bumps; do whichever applies.
 
 ### Alpine has a newer Tor within the current Alpine release
 
-Nothing in this repo needs to change to pick up the new Tor — `apk add tor` will resolve to the new version on the next image build. Update `startos/versions/index.ts` (`version` + `releaseNotes`) and rebuild.
+Nothing in this repo needs to change to pick up the new Tor — `apk add tor` will resolve to the new version on the next image build. Update `startos/versions/current.ts` (`version` + `releaseNotes`) and rebuild.
 
 ### Need a newer Alpine to reach a newer Tor
 
@@ -65,4 +65,4 @@ Edit `Dockerfile`:
 FROM alpine:<new-tag>
 ```
 
-Then update `startos/versions/index.ts` (`version` + `releaseNotes`) and rebuild.
+Then update `startos/versions/current.ts` (`version` + `releaseNotes`) and rebuild.
