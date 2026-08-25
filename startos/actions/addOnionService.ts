@@ -39,26 +39,28 @@ const inputSpec = InputSpec.of({
 })
   .add(({ Value }) => ({
     ssl: Value.dynamicToggle(async ({ effects, prefill }) => {
-      const { packageId, hostId, internalPort } =
+      const { packageId, hostId, interfaceId, internalPort } =
         prefill?.urlPluginMetadata ?? {}
-      // Default to whatever the interface's other addresses already are. A
-      // `secure: null` binding publishes its plaintext port on the bridge and
-      // nowhere else, so off the box every address it has is the TLS one; a
-      // binding that declares itself secure publishes plaintext on LAN too.
-      const secure =
+      const binding =
         packageId && hostId && internalPort != null
           ? await sdk.host
               .get(
                 effects,
                 { hostId, packageId },
-                (host) => host?.bindings[internalPort]?.options.secure ?? null,
+                (host) => host?.bindings[internalPort] ?? null,
               )
               .once()
           : null
+      const secure = binding?.options.secure ?? null
+      const servesOwnTls = secure?.ssl === true
+      // Tor authenticates the address itself, so a certificate on a UI's onion
+      // buys a browser warning and nothing else.
+      const isUi =
+        !!interfaceId && binding?.interfaces[interfaceId]?.type === 'ui'
       return {
         name: i18n('SSL'),
         description: i18n('Serve this address with SSL'),
-        default: secure === null,
+        default: servesOwnTls || (!isUi && secure === null),
       }
     }),
   }))

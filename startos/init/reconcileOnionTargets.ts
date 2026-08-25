@@ -16,10 +16,8 @@ import { sdk } from '../sdk'
  * addresses and leave the bridge ones alone. It is ordered ahead of
  * `reloadTorrc` so a repair reaches Tor in the same pass that finds it.
  *
- * Key material is never touched. An entry whose ssl mode the binding no longer
- * offers is reported and left as it is, since retargeting cannot repair it, and
- * a lookup that throws leaves its entry alone rather than taking the service
- * down with it.
+ * Key material is never touched, and a lookup that throws leaves its entry alone
+ * rather than taking the service down with it.
  */
 export const reconcileOnionTargets = sdk.setupOnInit(async (effects) => {
   const onionServices = await torrc.read((t) => t.onionServices).once()
@@ -37,16 +35,27 @@ export const reconcileOnionTargets = sdk.setupOnInit(async (effects) => {
           if (!portInfo) continue
           const where = `${packageId}/${hostId}:${externalPort}`
 
-          let target: string | null
-          try {
-            target = await sdk.host
+          const bridge = (ssl: boolean) =>
+            sdk.host
               .getBridgeAddress(effects, {
                 packageId,
                 hostId,
                 internalPort: portInfo.internalPort,
-                ssl: portInfo.ssl,
+                ssl,
               })
               .const()
+
+          let ssl = portInfo.ssl
+          let target: string | null
+          try {
+            target = await bridge(ssl)
+            if (target === null) {
+              // The binding stopped serving the mode this entry recorded, so
+              // follow the mode it does serve: the address keeps answering on
+              // the port it advertises, and the annotation stops lying about it.
+              ssl = !ssl
+              target = await bridge(ssl)
+            }
           } catch (e) {
             console.warn(`Skipping ${where}: ${String(e)}`)
             continue
@@ -54,9 +63,11 @@ export const reconcileOnionTargets = sdk.setupOnInit(async (effects) => {
 
           if (target === null) {
             unservable.push(where)
-          } else if (target !== portInfo.target) {
-            svc.ports[externalPort] = { ...portInfo, target }
-            retargeted.push(`${where} ${portInfo.target} -> ${target}`)
+          } else if (target !== portInfo.target || ssl !== portInfo.ssl) {
+            svc.ports[externalPort] = { ...portInfo, target, ssl }
+            retargeted.push(
+              `${where} ${portInfo.target}${portInfo.ssl ? ' ssl' : ''} -> ${target}${ssl ? ' ssl' : ''}`,
+            )
           }
         }
       }
