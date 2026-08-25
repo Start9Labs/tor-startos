@@ -6,6 +6,7 @@ import { exportUrls, registerUrlPlugin } from '../plugin/url'
 import { sdk } from '../sdk'
 import { versionGraph } from '../versions'
 import { migrateOnionAddresses } from './migrateOnionAddresses'
+import { reconcileOnionTargets } from './reconcileOnionTargets'
 import { reloadTorrc } from './reloadTorrc'
 import { seedFiles } from './seedFiles'
 
@@ -19,6 +20,7 @@ export const init = sdk.setupInit(
   registerUrlPlugin,
   migrateOnionAddresses,
   exportUrls,
+  reconcileOnionTargets,
   reloadTorrc,
 )
 
