@@ -27,92 +27,118 @@ const privateKeySpec = InputSpec.of({
   }),
 })
 
+type UrlPluginMetadata = {
+  packageId: string
+  interfaceId: string
+  hostId: string
+  internalPort: number
+}
+
 const inputSpec = InputSpec.of({
-  urlPluginMetadata: Value.hidden<{
-    packageId: string
-    interfaceId: string
-    hostId: string
-    internalPort: number
-  }>(),
-  ssl: Value.toggle({
-    name: i18n('SSL'),
-    description: i18n('Serve this address with SSL'),
-    default: false,
-  }),
-}).add(({ Value }) => ({
-  address: Value.dynamicUnion(async ({ effects, prefill }) => {
-    const { packageId, hostId, internalPort } = prefill?.urlPluginMetadata ?? {}
-
-    const config = await torrc.read().once()
-    const entries =
-      (packageId && hostId && config?.onionServices?.[packageId]?.[hostId]) ||
-      {}
-
-    // Which onion bindings this interface can serve, mirroring the execution
-    // path: a plaintext primary unless the service terminates its own TLS, plus
-    // an SSL binding when it's native-SSL or StartOS adds SSL.
-    const host =
-      packageId && hostId
-        ? await sdk.host.get(effects, { hostId, packageId }).once()
-        : null
-    const binding =
-      internalPort != null ? host?.bindings[internalPort] : undefined
-    const nativeSsl = binding?.options.secure?.ssl === true
-    const availNonSsl = !!binding?.enabled && !nativeSsl
-    const availSsl =
-      !!binding?.enabled && (nativeSsl || !!binding.options.addSsl)
-
-    const variants: Record<
-      string,
-      {
-        name: string
-        spec: typeof privateKeySpec | ReturnType<typeof InputSpec.of>
+  urlPluginMetadata: Value.hidden<UrlPluginMetadata>(),
+})
+  .add(({ Value }) => ({
+    ssl: Value.dynamicToggle(async ({ effects, prefill }) => {
+      const { packageId, hostId, interfaceId, internalPort } =
+        prefill?.urlPluginMetadata ?? {}
+      const binding =
+        packageId && hostId && internalPort != null
+          ? await sdk.host
+              .get(
+                effects,
+                { hostId, packageId },
+                (host) => host?.bindings[internalPort] ?? null,
+              )
+              .once()
+          : null
+      const secure = binding?.options.secure ?? null
+      const servesOwnTls = secure?.ssl === true
+      // Tor authenticates the address itself, so a certificate on a UI's onion
+      // buys a browser warning and nothing else.
+      const isUi =
+        !!interfaceId && binding?.interfaces[interfaceId]?.type === 'ui'
+      return {
+        name: i18n('SSL'),
+        description: i18n('Serve this address with SSL'),
+        default: servesOwnTls || (!isUi && secure === null),
       }
-    > = {}
+    }),
+  }))
+  .add(({ Value }) => ({
+    address: Value.dynamicUnion(async ({ effects, prefill }) => {
+      const { packageId, hostId, internalPort } =
+        prefill?.urlPluginMetadata ?? {}
 
-    for (const [key, entry] of Object.entries(entries)) {
-      if (!entry || internalPort == null) continue
+      const config = await torrc.read().once()
+      const entries =
+        (packageId && hostId && config?.onionServices?.[packageId]?.[hostId]) ||
+        {}
 
-      const bindingPorts = Object.values(entry.ports).filter(
-        (p) => p?.internalPort === internalPort,
-      )
-      const hasNonSsl = bindingPorts.some((p) => p && !p.ssl)
-      const hasSsl = bindingPorts.some((p) => p?.ssl)
+      // Which onion bindings this interface can serve, mirroring the execution
+      // path: a plaintext primary unless the service terminates its own TLS, plus
+      // an SSL binding when it's native-SSL or StartOS adds SSL.
+      const host =
+        packageId && hostId
+          ? await sdk.host.get(effects, { hostId, packageId }).once()
+          : null
+      const binding =
+        internalPort != null ? host?.bindings[internalPort] : undefined
+      const nativeSsl = binding?.options.secure?.ssl === true
+      const availNonSsl = !!binding?.enabled && !nativeSsl
+      const availSsl =
+        !!binding?.enabled && (nativeSsl || !!binding.options.addSsl)
 
-      // Skip an address that doesn't serve this binding at all, or one already
-      // attached to every binding the interface offers (non-SSL, plus SSL when
-      // available).
-      if (!hasNonSsl && !hasSsl) continue
-      if ((!availNonSsl || hasNonSsl) && (!availSsl || hasSsl)) continue
+      const variants: Record<
+        string,
+        {
+          name: string
+          spec: typeof privateKeySpec | ReturnType<typeof InputSpec.of>
+        }
+      > = {}
 
-      let hostname = key
-      try {
-        const content = await sdk.volumes.tor.readFile(
-          `${hsDir(packageId!, hostId!, key)}/hostname`,
+      for (const [key, entry] of Object.entries(entries)) {
+        if (!entry || internalPort == null) continue
+
+        const bindingPorts = Object.values(entry.ports).filter(
+          (p) => p?.internalPort === internalPort,
         )
-        hostname = content.toString().trim()
-      } catch {
-        // hostname file doesn't exist yet
-      }
-      variants[key] = {
-        name: hostname,
-        spec: InputSpec.of({}),
-      }
-    }
+        const hasNonSsl = bindingPorts.some((p) => p && !p.ssl)
+        const hasSsl = bindingPorts.some((p) => p?.ssl)
 
-    variants['new'] = {
-      name: i18n('Create new address'),
-      spec: privateKeySpec,
-    }
+        // Skip an address that doesn't serve this binding at all, or one already
+        // attached to every binding the interface offers (non-SSL, plus SSL when
+        // available).
+        if (!hasNonSsl && !hasSsl) continue
+        if ((!availNonSsl || hasNonSsl) && (!availSsl || hasSsl)) continue
 
-    return {
-      name: i18n('Address'),
-      default: 'new',
-      disabled: false,
-      variants: Variants.of(variants),
-    }
-  }),
-}))
+        let hostname = key
+        try {
+          const content = await sdk.volumes.tor.readFile(
+            `${hsDir(packageId!, hostId!, key)}/hostname`,
+          )
+          hostname = content.toString().trim()
+        } catch {
+          // hostname file doesn't exist yet
+        }
+        variants[key] = {
+          name: hostname,
+          spec: InputSpec.of({}),
+        }
+      }
+
+      variants['new'] = {
+        name: i18n('Create new address'),
+        spec: privateKeySpec,
+      }
+
+      return {
+        name: i18n('Address'),
+        default: 'new',
+        disabled: false,
+        variants: Variants.of(variants),
+      }
+    }),
+  }))
 
 export const addOnionService = sdk.Action.withInput(
   // id

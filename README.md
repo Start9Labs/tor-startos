@@ -109,6 +109,8 @@ Tor registers itself as StartOS's `url-v0` plugin provider, which is how `.onion
 
 That pruning only fires on a host StartOS confirms is gone. A lookup that throws leaves the entry and its keys alone, because "I could not resolve this" is not "this no longer exists."
 
+**An onion's forward target is re-derived on every start.** The `HiddenServicePort` target stored in `torrc` is the external port the binding held when the entry was written, and a binding's ports move — a package gaining `addSsl`, an OS upgrade reassigning them — after which Tor forwards to a port nothing owns and the address is refused at the SOCKS layer. An init handler resolves each entry's bridge address afresh and rewrites the ones that have drifted, which repairs the address without touching its key. It is a `.const()` watcher, so it also fires the moment a binding moves rather than waiting for the next start. An entry whose interface stopped serving the mode it was created with follows the mode it does serve instead — a plaintext onion on a binding that has become TLS-only is re-pointed at the TLS address and re-annotated — so the address keeps answering on the port it advertises. Only an entry with no bridge-reachable address at all is logged and left as it is.
+
 ## Installation and First-Run Flow
 
 Nothing to configure and nothing to reveal. Install writes a torrc, starts Tor, and the SOCKS proxy is available to other services as soon as the bootstrap completes. There is no task, no account, and no credential.
@@ -192,9 +194,10 @@ Only the `tor` volume is copied — `sdk.Backups.ofVolumes('tor')`.
 2. **Onion services are not added by hand.** They come from other services through the URL plugin; the actions that create them are hidden.
 3. **Deleting an onion service is irreversible** — the key is the address.
 4. **Onion entries whose target host is gone are pruned automatically**, key material included.
-5. **The SOCKS proxy is not exported** and is reachable only over loopback and the LXC bridge, never the LAN.
-6. **The relay never acts as an exit.**
-7. **The health check can restart the service on its own.** That is the watchdog working as intended, not a fault.
+5. **An onion whose interface has no bridge-reachable address at all is logged, not repaired** — there is nothing to point it at, so the address has to be re-added once the interface is back.
+6. **The SOCKS proxy is not exported** and is reachable only over loopback and the LXC bridge, never the LAN.
+7. **The relay never acts as an exit.**
+8. **The health check can restart the service on its own.** That is the watchdog working as intended, not a fault.
 
 ---
 
