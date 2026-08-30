@@ -99,9 +99,11 @@ The SOCKS proxy is a binding with **no exported interface**, and that is deliber
 
 | Interface         | Id   | Type | Port                   | Present when       |
 | ----------------- | ---- | ---- | ---------------------- | ------------------ |
-| Tor Relay OR Port | `or` | api  | The configured OR port | A relay is enabled |
+| Tor Relay OR Port | `or` | p2p  | The configured OR port | A relay is enabled |
 
-**The relay port is the exception to everything else here**: it is exported precisely so it can be reached from the public internet, which is what running a relay means.
+**The relay port is the exception to everything else here**: it is exported precisely so it can be reached from the public internet, which is what running a relay means. Its binding is `secure: { ssl: false }` — the OR protocol carries its own TLS, so StartOS treats it like any self-securing p2p port: LAN and `.local` addresses serve as soon as the interface exists, while each gateway's **Public** address is offered but stays off until the user enables it. The listener inside the container is IPv4-only, so an IPv6 address exposed to the WAN has nothing behind it.
+
+Public reachability is a two-sided contract. Enabling the Public address on a gateway opens the inbound path there — StartTunnel publishes the port automatically, a home router needs a manual forward — while the address the relay *announces* comes from what the Tor directory authorities observe on its **outbound** connections, since the generated `torrc` sets no `Address` line. The two must be the same gateway, or the relay announces an IP nobody forwards. A persistent `has not managed to confirm reachability for its ORPort(s)` warning means that inbound path is missing or on the wrong gateway; it is not a bootstrap problem, and **Reset Tor Connection** will not fix it. Two subtler causes of the same warning: the Public enable is stored against the exact address and port, so changing the OR port or the gateway's public IP drops it until re-enabled; and if another service already holds the OR port's external slot, StartOS assigns a different external port while Tor still advertises the configured one — the interface page shows the port actually assigned.
 
 ### The URL plugin
 
@@ -138,7 +140,8 @@ Turns this node into a Tor relay or bridge, and sets its nickname, contact info,
 - **What it changes:** the `relay` section of `torrc`, and through it the presence of the OR interface.
 - **Cost:** seconds, then a config reload.
 - **Repeat safety:** idempotent; the form is pre-filled.
-- **Enabling a relay publishes a port to the internet** and contributes your bandwidth to the network. The relay is configured to never act as an exit.
+- **Enabling a relay is not the whole job.** It creates the OR interface; the port reaches the internet only once its **Public** address is enabled — see Interfaces above. A relay whose reachability was never confirmed contributes nothing and publishes no descriptor.
+- **A relay contributes your bandwidth to the network.** The relay is configured to never act as an exit.
 - **The relay identity is separate from your onion addresses.** It lives under `keys/` and survives the recovery wipe, so a relay keeps its fingerprint and its accumulated reputation.
 
 ### Reset Tor Connection
@@ -222,7 +225,7 @@ file_models:
 startos_managed_env_vars: []
 dependencies: []
 interfaces:
-  or: { type: api, port: 9001 } # only while a relay is enabled; port is configurable
+  or: { type: p2p, port: 9001 } # only while a relay is enabled; port is configurable
 actions:
   - add-onion-service # hidden; driven by the url-v0 plugin
   - delete-onion-service # hidden; driven by the url-v0 plugin

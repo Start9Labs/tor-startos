@@ -25,14 +25,16 @@ export const setInterfaces = sdk.setupInterfaces(async ({ effects }) => {
     protocol: null,
     preferredExternalPort: orPort,
     addSsl: null,
-    secure: null,
+    // The OR protocol is self-securing TLS. `secure: null` would treat it as
+    // plaintext and never offer the port a public address.
+    secure: { ssl: false },
   })
 
   const orInterface = sdk.createInterface(effects, {
     name: i18n('Tor Relay OR Port'),
     id: 'or',
     description: i18n('Tor relay port for the Tor network'),
-    type: 'api',
+    type: 'p2p',
     masked: false,
     schemeOverride: null,
     username: null,

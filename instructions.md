@@ -40,3 +40,6 @@ If Tor still can't connect after a reset, its health status will say so, and the
 1. Open Tor's **Actions** menu and run **Configure Relay**.
 2. Toggle **Enabled**, then set a nickname, contact info, OR port, and bandwidth rate / burst. For a bridge, enable **Bridge Mode**.
 3. Save. The OR port shows up under **Interfaces** as **Tor Relay OR Port** once relay mode is on.
+4. Open the **Tor Relay OR Port** interface and enable the **Public** address — on the same connection Tor uses for its outbound traffic, since that is the address your relay announces. Behind StartTunnel that is all; on a home connection, also forward the OR port on your router to your server.
+
+Give Tor a few minutes, then check its logs: `Self-testing indicates your ORPort is reachable from the outside. Excellent.` means the relay is working, and it will appear in [Relay Search](https://metrics.torproject.org/rs.html) within a few hours. If the log instead keeps warning that reachability could not be confirmed, the port is not reaching your server — recheck which connection the Public address is enabled on and, on a home connection, your router's port forward. If you change the OR port later, or your public IP changes, enable the Public address again.
