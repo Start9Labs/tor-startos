@@ -1,18 +1,13 @@
 import { VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '0.4.9.11:7',
+  version: '0.4.9.11:8',
   releaseNotes: {
-    en_US: `- Repairs Tor addresses that stopped answering after the service they point at changed the ports or the encryption it is served on. They are re-pointed the next time Tor starts, and your .onion addresses are unchanged.
-- When you add a Tor address for a service reachable only over SSL, the SSL toggle now starts on instead of off. Web interfaces still start off, since Tor already secures the connection.`,
-    es_ES: `- Repara las direcciones Tor que dejaron de responder después de que el servicio al que apuntan cambiara los puertos o el cifrado con que se sirve. Se vuelven a apuntar la próxima vez que se inicie Tor, y sus direcciones .onion no cambian.
-- Al añadir una dirección Tor para un servicio accesible solo por SSL, el interruptor SSL ahora empieza encendido en lugar de apagado. Las interfaces web siguen empezando apagadas, ya que Tor ya protege la conexión.`,
-    de_DE: `- Repariert Tor-Adressen, die nicht mehr antworteten, nachdem der Dienst, auf den sie zeigen, die Ports oder die Verschlüsselung gewechselt hat, über die er bereitgestellt wird. Sie werden beim nächsten Start von Tor neu ausgerichtet; Ihre .onion-Adressen bleiben unverändert.
-- Beim Hinzufügen einer Tor-Adresse für einen Dienst, der nur über SSL erreichbar ist, steht der SSL-Schalter jetzt anfangs auf ein statt auf aus. Weboberflächen starten weiterhin ausgeschaltet, da Tor die Verbindung bereits absichert.`,
-    pl_PL: `- Naprawia adresy Tor, które przestały odpowiadać po tym, jak usługa, na którą wskazują, zmieniła porty lub szyfrowanie, na których jest udostępniana. Zostaną przekierowane przy następnym uruchomieniu Tora, a Twoje adresy .onion pozostają bez zmian.
-- Przy dodawaniu adresu Tor dla usługi dostępnej wyłącznie przez SSL przełącznik SSL zaczyna teraz włączony zamiast wyłączony. Interfejsy internetowe nadal zaczynają wyłączone, ponieważ Tor już zabezpiecza połączenie.`,
-    fr_FR: `- Répare les adresses Tor qui ne répondaient plus après que le service vers lequel elles pointent a changé les ports ou le chiffrement avec lesquels il est servi. Elles sont redirigées au prochain démarrage de Tor, et vos adresses .onion restent inchangées.
-- Lorsque vous ajoutez une adresse Tor pour un service accessible uniquement via SSL, le commutateur SSL démarre désormais activé au lieu de désactivé. Les interfaces web démarrent toujours désactivées, car Tor sécurise déjà la connexion.`,
+    en_US: `Fixes relay and bridge mode: the OR port was never offered a public address, so the relay could not be reached from the internet and never joined the Tor network. After updating, open the Tor Relay OR Port interface and enable the Public address on the same connection Tor uses for outbound traffic — the instructions walk through it.`,
+    es_ES: `Corrige el modo de repetidor y puente: al puerto OR nunca se le ofrecía una dirección pública, por lo que el repetidor no podía ser alcanzado desde internet y nunca se unía a la red Tor. Tras actualizar, abra la interfaz Tor Relay OR Port y habilite la dirección pública en la misma conexión que Tor usa para el tráfico saliente; las instrucciones detallan los pasos.`,
+    de_DE: `Behebt den Relay- und Bridge-Modus: dem OR-Port wurde nie eine öffentliche Adresse angeboten, sodass das Relay aus dem Internet nicht erreichbar war und dem Tor-Netzwerk nie beigetreten ist. Öffnen Sie nach dem Update die Schnittstelle Tor Relay OR Port und aktivieren Sie die öffentliche Adresse auf derselben Verbindung, die Tor für ausgehenden Verkehr nutzt; die Anleitung beschreibt die Schritte.`,
+    pl_PL: `Naprawia tryb przekaźnika i mostka: portowi OR nigdy nie oferowano adresu publicznego, więc przekaźnik nie był osiągalny z internetu i nigdy nie dołączał do sieci Tor. Po aktualizacji otwórz interfejs Tor Relay OR Port i włącz adres publiczny na tym samym połączeniu, którego Tor używa dla ruchu wychodzącego; instrukcja opisuje kolejne kroki.`,
+    fr_FR: `Corrige le mode relais et pont : le port OR ne se voyait jamais proposer d'adresse publique, le relais ne pouvait donc pas être joint depuis internet et ne rejoignait jamais le réseau Tor. Après la mise à jour, ouvrez l'interface Tor Relay OR Port et activez l'adresse publique sur la même connexion que Tor utilise pour le trafic sortant ; les instructions détaillent la marche à suivre.`,
   },
   migrations: {},
 })
