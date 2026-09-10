@@ -1,13 +1,18 @@
 import { VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '0.4.9.11:8',
+  version: '0.4.9.12:0',
   releaseNotes: {
-    en_US: `Fixes relay and bridge mode: the OR port was never offered a public address, so the relay could not be reached from the internet and never joined the Tor network. After updating, open the Tor Relay OR Port interface and enable the Public address on the same connection Tor uses for outbound traffic — the instructions walk through it.`,
-    es_ES: `Corrige el modo de repetidor y puente: al puerto OR nunca se le ofrecía una dirección pública, por lo que el repetidor no podía ser alcanzado desde internet y nunca se unía a la red Tor. Tras actualizar, abra la interfaz Tor Relay OR Port y habilite la dirección pública en la misma conexión que Tor usa para el tráfico saliente; las instrucciones detallan los pasos.`,
-    de_DE: `Behebt den Relay- und Bridge-Modus: dem OR-Port wurde nie eine öffentliche Adresse angeboten, sodass das Relay aus dem Internet nicht erreichbar war und dem Tor-Netzwerk nie beigetreten ist. Öffnen Sie nach dem Update die Schnittstelle Tor Relay OR Port und aktivieren Sie die öffentliche Adresse auf derselben Verbindung, die Tor für ausgehenden Verkehr nutzt; die Anleitung beschreibt die Schritte.`,
-    pl_PL: `Naprawia tryb przekaźnika i mostka: portowi OR nigdy nie oferowano adresu publicznego, więc przekaźnik nie był osiągalny z internetu i nigdy nie dołączał do sieci Tor. Po aktualizacji otwórz interfejs Tor Relay OR Port i włącz adres publiczny na tym samym połączeniu, którego Tor używa dla ruchu wychodzącego; instrukcja opisuje kolejne kroki.`,
-    fr_FR: `Corrige le mode relais et pont : le port OR ne se voyait jamais proposer d'adresse publique, le relais ne pouvait donc pas être joint depuis internet et ne rejoignait jamais le réseau Tor. Après la mise à jour, ouvrez l'interface Tor Relay OR Port et activez l'adresse publique sur la même connexion que Tor utilise pour le trafic sortant ; les instructions détaillent la marche à suivre.`,
+    en_US:
+      'Updated Tor to 0.4.9.12. This urgent security release fixes multiple use-after-free and memory denial-of-service vulnerabilities, tightens DNS validation, and corrects congestion control and stream isolation. Relay operators should update promptly because directory authorities no longer accept descriptors with obsolete TAP keys. [Full upstream release notes](https://gitlab.torproject.org/tpo/core/tor/-/raw/tor-0.4.9.12/ReleaseNotes)',
+    es_ES:
+      'Tor se ha actualizado a la versión 0.4.9.12. Esta versión de seguridad urgente corrige varias vulnerabilidades de uso de memoria después de liberarla y de denegación de servicio por agotamiento de memoria, refuerza la validación de DNS y corrige el control de congestión y el aislamiento de flujos. Los operadores de repetidores deben actualizar cuanto antes porque las autoridades de directorio ya no aceptan descriptores con claves TAP obsoletas. [Notas completas de la versión upstream](https://gitlab.torproject.org/tpo/core/tor/-/raw/tor-0.4.9.12/ReleaseNotes)',
+    de_DE:
+      'Tor wurde auf Version 0.4.9.12 aktualisiert. Dieses dringende Sicherheitsupdate behebt mehrere Use-after-Free- und speicherbasierte Denial-of-Service-Schwachstellen, verschärft die DNS-Validierung und korrigiert die Überlastungssteuerung sowie die Stream-Isolierung. Relay-Betreiber sollten zeitnah aktualisieren, da Verzeichnisautoritäten keine Deskriptoren mit veralteten TAP-Schlüsseln mehr akzeptieren. [Vollständige Upstream-Versionshinweise](https://gitlab.torproject.org/tpo/core/tor/-/raw/tor-0.4.9.12/ReleaseNotes)',
+    pl_PL:
+      'Zaktualizowano Tor do wersji 0.4.9.12. Ta pilna aktualizacja zabezpieczeń naprawia kilka luk typu use-after-free i odmowy usługi przez wyczerpanie pamięci, zaostrza walidację DNS oraz poprawia kontrolę przeciążenia i izolację strumieni. Operatorzy przekaźników powinni szybko przeprowadzić aktualizację, ponieważ serwery katalogowe nie akceptują już deskryptorów z przestarzałymi kluczami TAP. [Pełne informacje o wydaniu upstream](https://gitlab.torproject.org/tpo/core/tor/-/raw/tor-0.4.9.12/ReleaseNotes)',
+    fr_FR:
+      'Tor a été mis à jour vers la version 0.4.9.12. Cette mise à jour de sécurité urgente corrige plusieurs vulnérabilités d’utilisation de mémoire après libération et de déni de service par épuisement de mémoire, renforce la validation DNS et corrige le contrôle de congestion ainsi que l’isolation des flux. Les opérateurs de relais doivent effectuer la mise à jour rapidement, car les autorités d’annuaire n’acceptent plus les descripteurs contenant des clés TAP obsolètes. [Notes de version upstream complètes](https://gitlab.torproject.org/tpo/core/tor/-/raw/tor-0.4.9.12/ReleaseNotes)',
   },
   migrations: {},
 })
