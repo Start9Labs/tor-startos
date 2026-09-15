@@ -142,6 +142,7 @@ Turns this node into a Tor relay or bridge, and sets its nickname, contact info,
 - **Repeat safety:** idempotent; the form is pre-filled.
 - **Enabling a relay is not the whole job.** It creates the OR interface; the port reaches the internet only once its **Public** address is enabled — see Interfaces above. A relay whose reachability was never confirmed contributes nothing and publishes no descriptor.
 - **A relay contributes your bandwidth to the network.** The relay is configured to never act as an exit.
+- **Bandwidth rate and burst are in KB/s, and burst must be at least the rate.** Tor rejects a relay below 75 KB/s or a burst below the rate, so the form enforces both. The `torrc` lines may carry either `KBytes` or `MBytes`; both read back in KB/s.
 - **The relay identity is separate from your onion addresses.** It lives under `keys/` and survives the recovery wipe, so a relay keeps its fingerprint and its accumulated reputation.
 
 ### Reset Tor Connection
