@@ -38,7 +38,7 @@ If Tor still can't connect after a reset, its health status will say so, and the
 ### Running a relay or bridge
 
 1. Open Tor's **Actions** menu and run **Configure Relay**.
-2. Toggle **Enabled**, then set a nickname, contact info, OR port, and bandwidth rate / burst. For a bridge, enable **Bridge Mode**.
+2. Toggle **Enabled**, then set a nickname, contact info, OR port, and bandwidth rate / burst in KB/s (Tor needs at least 75 KB/s, and the burst must be at least the rate). For a bridge, enable **Bridge Mode**.
 3. Save. The OR port shows up under **Interfaces** as **Tor Relay OR Port** once relay mode is on.
 4. Open the **Tor Relay OR Port** interface and enable the **Public** address — on the same connection Tor uses for its outbound traffic, since that is the address your relay announces. Behind StartTunnel that is all; on a home connection, also forward the OR port on your router to your server.
 

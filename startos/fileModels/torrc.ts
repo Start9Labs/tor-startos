@@ -20,8 +20,8 @@ export const relayShape = z.object({
   contactInfo: z.string().optional().catch(undefined),
   bridge: z.boolean().catch(false),
   orPort: z.number().catch(9001),
-  bandwidthRate: z.number().catch(1),
-  bandwidthBurst: z.number().catch(2),
+  bandwidthRate: z.number().catch(1024),
+  bandwidthBurst: z.number().catch(2048),
 })
 
 const shape = z.object({
@@ -47,8 +47,8 @@ const shape = z.object({
     enabled: false,
     bridge: false,
     orPort: 9001,
-    bandwidthRate: 1,
-    bandwidthBurst: 2,
+    bandwidthRate: 1024,
+    bandwidthBurst: 2048,
   }),
 })
 
@@ -115,8 +115,8 @@ function toFile(config: TorrcConfig): string {
     if (relay.nickname) lines.push(`Nickname ${relay.nickname}`)
     if (relay.contactInfo) lines.push(`ContactInfo ${relay.contactInfo}`)
     if (relay.bridge) lines.push('BridgeRelay 1')
-    lines.push(`RelayBandwidthRate ${relay.bandwidthRate} MBytes`)
-    lines.push(`RelayBandwidthBurst ${relay.bandwidthBurst} MBytes`)
+    lines.push(`RelayBandwidthRate ${relay.bandwidthRate} KBytes`)
+    lines.push(`RelayBandwidthBurst ${relay.bandwidthBurst} KBytes`)
     lines.push('ExitRelay 0')
     lines.push('')
   }
@@ -124,13 +124,16 @@ function toFile(config: TorrcConfig): string {
   return lines.join('\n')
 }
 
+const kbytes = (n: string, unit: string) =>
+  parseInt(n, 10) * (unit === 'M' ? 1024 : 1)
+
 /**
  * Parses a torrc file back into structured config.
  * Uses a state machine to group HiddenServiceDir/HiddenServicePort blocks,
  * reading `# @service`, `# @ssl`, and `# @internalPort` annotations to
  * recover metadata.
- * Bandwidth values are stored as numbers in MBytes; parseInt extracts the
- * leading number from the "N MBytes" format we always write.
+ * Bandwidth values are stored in KBytes; a torrc written by an earlier
+ * release carries MBytes.
  */
 function fromFile(raw: string): unknown {
   const res: z.infer<typeof shape> = {
@@ -139,8 +142,8 @@ function fromFile(raw: string): unknown {
       enabled: false,
       bridge: false,
       orPort: 9001,
-      bandwidthRate: 1,
-      bandwidthBurst: 2,
+      bandwidthRate: 1024,
+      bandwidthBurst: 2048,
     },
   }
 
@@ -242,10 +245,10 @@ function fromFile(raw: string): unknown {
       res.relay.contactInfo = m[1]
     } else if (trimmed === 'BridgeRelay 1') {
       res.relay.bridge = true
-    } else if ((m = trimmed.match(/^RelayBandwidthRate (.+)/))) {
-      res.relay.bandwidthRate = parseInt(m[1], 10) || 1
-    } else if ((m = trimmed.match(/^RelayBandwidthBurst (.+)/))) {
-      res.relay.bandwidthBurst = parseInt(m[1], 10) || 2
+    } else if ((m = trimmed.match(/^RelayBandwidthRate (\d+) ([KM])Bytes/))) {
+      res.relay.bandwidthRate = kbytes(m[1], m[2])
+    } else if ((m = trimmed.match(/^RelayBandwidthBurst (\d+) ([KM])Bytes/))) {
+      res.relay.bandwidthBurst = kbytes(m[1], m[2])
     }
   }
 

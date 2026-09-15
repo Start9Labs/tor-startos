@@ -35,6 +35,9 @@ const dict = {
   'Tor will be offline for a few minutes while it reconnects. Your .onion addresses are not affected.': 31,
   'Reset Started': 32,
   'Tor is restarting and will reconnect with new entry nodes. This takes a few minutes.': 33,
+  'Tor requires at least 75 KB/s for a relay.': 34,
+  'Must be at least the Bandwidth Rate.': 35,
+  'Bandwidth Burst must be at least the Bandwidth Rate.': 36,
 } as const
 
 export type I18nKey = keyof typeof dict

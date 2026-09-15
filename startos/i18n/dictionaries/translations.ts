@@ -36,6 +36,9 @@ export default {
     31: 'Tor estará fuera de servicio unos minutos mientras se reconecta. Sus direcciones .onion no se ven afectadas.',
     32: 'Restablecimiento iniciado',
     33: 'Tor se está reiniciando y se reconectará con nuevos nodos de entrada. Esto tarda unos minutos.',
+    34: 'Tor requiere al menos 75 KB/s para un relé.',
+    35: 'Debe ser al menos igual a la tasa de ancho de banda.',
+    36: 'La ráfaga de ancho de banda debe ser al menos igual a la tasa de ancho de banda.',
   },
   de_DE: {
     0: 'Tor läuft',
@@ -72,6 +75,9 @@ export default {
     31: 'Tor ist einige Minuten offline, während es sich neu verbindet. Ihre .onion-Adressen sind nicht betroffen.',
     32: 'Zurücksetzen gestartet',
     33: 'Tor startet neu und verbindet sich mit neuen Eingangsknoten. Das dauert einige Minuten.',
+    34: 'Tor benötigt für ein Relay mindestens 75 KB/s.',
+    35: 'Muss mindestens der Bandbreitenrate entsprechen.',
+    36: 'Der Bandbreitenstoß muss mindestens der Bandbreitenrate entsprechen.',
   },
   pl_PL: {
     0: 'Tor działa',
@@ -108,6 +114,9 @@ export default {
     31: 'Tor będzie niedostępny przez kilka minut, gdy będzie się łączył ponownie. Twoje adresy .onion nie są naruszone.',
     32: 'Rozpoczęto resetowanie',
     33: 'Tor uruchamia się ponownie i połączy się z nowymi węzłami wejściowymi. Zajmie to kilka minut.',
+    34: 'Tor wymaga co najmniej 75 KB/s dla przekaźnika.',
+    35: 'Musi być co najmniej równa szybkości przepustowości.',
+    36: 'Skok przepustowości musi być co najmniej równy szybkości przepustowości.',
   },
   fr_FR: {
     0: 'Tor fonctionne',
@@ -144,5 +153,8 @@ export default {
     31: 'Tor sera hors ligne quelques minutes le temps de se reconnecter. Vos adresses .onion ne sont pas affectées.',
     32: 'Réinitialisation lancée',
     33: "Tor redémarre et se reconnectera avec de nouveaux nœuds d'entrée. Cela prend quelques minutes.",
+    34: 'Tor exige au moins 75 Ko/s pour un relais.',
+    35: 'Doit être au moins égal au débit de bande passante.',
+    36: 'La rafale de bande passante doit être au moins égale au débit de bande passante.',
   },
 } satisfies Record<string, LangDict>

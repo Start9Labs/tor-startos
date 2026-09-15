@@ -56,25 +56,25 @@ export const relayInputSpec = InputSpec.of({
   }),
   bandwidthRate: Value.number({
     name: i18n('Bandwidth Rate'),
-    description: null,
-    required: false,
-    default: 1,
-    min: 1,
+    description: i18n('Tor requires at least 75 KB/s for a relay.'),
+    required: true,
+    default: 1024,
+    min: 75,
     max: null,
     integer: true,
     placeholder: null,
-    units: 'MB/s',
+    units: 'KB/s',
   }),
   bandwidthBurst: Value.number({
     name: i18n('Bandwidth Burst'),
-    description: null,
-    required: false,
-    default: 2,
-    min: 1,
+    description: i18n('Must be at least the Bandwidth Rate.'),
+    required: true,
+    default: 2048,
+    min: 75,
     max: null,
     integer: true,
     placeholder: null,
-    units: 'MB/s',
+    units: 'KB/s',
   }),
 })
 
@@ -102,6 +102,11 @@ export const configureRelay = sdk.Action.withInput(
 
   // execution: merge relay input, converting nulls to undefined for zod .catch() defaults
   async ({ effects, input }) => {
+    if (input.bandwidthBurst < input.bandwidthRate) {
+      throw new Error(
+        i18n('Bandwidth Burst must be at least the Bandwidth Rate.'),
+      )
+    }
     await torrc.merge(effects, {
       relay: {
         enabled: input.enabled,
@@ -109,8 +114,8 @@ export const configureRelay = sdk.Action.withInput(
         contactInfo: input.contactInfo ?? undefined,
         bridge: input.bridge,
         orPort: input.orPort ?? undefined,
-        bandwidthRate: input.bandwidthRate ?? undefined,
-        bandwidthBurst: input.bandwidthBurst ?? undefined,
+        bandwidthRate: input.bandwidthRate,
+        bandwidthBurst: input.bandwidthBurst,
       },
     })
   },
