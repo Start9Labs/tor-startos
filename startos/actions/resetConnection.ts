@@ -24,7 +24,7 @@ export const resetConnection = sdk.Action.withoutInput(
   async ({ effects }) => {
     // The wipe itself has to happen with no tor process on the volume, so it is
     // queued for the next start rather than done here.
-    await requestWipe(effects)
+    await requestWipe()
     await sdk.restart(effects)
 
     return {

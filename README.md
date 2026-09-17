@@ -35,7 +35,7 @@
 
 ## Image and Container Runtime
 
-A four-line Alpine build around the distribution's `tor` package — no upstream image exists to use.
+A minimal Alpine build around the distribution's `tor` package — no upstream image exists to use.
 
 | Property      | Value                                   |
 | ------------- | --------------------------------------- |
@@ -45,7 +45,7 @@ A four-line Alpine build around the distribution's `tor` package — no upstream
 
 | Subcontainer | Purpose                                                             |
 | ------------ | ------------------------------------------------------------------- |
-| `tor-sub`    | The `tor` daemon — the one to `attach` to                           |
+| `tor-sub`    | The `tor` daemon — `start-cli package attach tor` lands in it       |
 | `chown-tmp`  | Temporary; re-owns hidden-service directories after a config change |
 
 **The daemon is pointed at a torrc on the volume, not the image's `/etc/tor/torrc`**, because the package generates that file and Tor has to read the generated one.
@@ -69,12 +69,11 @@ Everything else under `/var/lib/tor` divides into things the package generates (
 
 ## File Models
 
-Two models, and the interesting one is not a config format any parser handles.
+One model, and it is not a config format any parser handles.
 
-| File             | Volume | Format     | Modelled                                             | Written by                      |
-| ---------------- | ------ | ---------- | ---------------------------------------------------- | ------------------------------- |
-| `torrc`          | `tor`  | Tor config | Yes — `FileHelper` with custom serializer and parser | Every init, and three actions   |
-| `.watchdog.json` | `tor`  | JSON       | Yes — `FileHelper.json`                              | The health check and one action |
+| File    | Volume | Format     | Modelled                                             | Written by                    |
+| ------- | ------ | ---------- | ---------------------------------------------------- | ----------------------------- |
+| `torrc` | `tor`  | Tor config | Yes — `FileHelper` with custom serializer and parser | Every init, and three actions |
 
 **`torrc` is generated wholesale from structured data, then parsed back out of the same file.** There is no round-trippable torrc format, so the serializer embeds `# @service`, `# @ssl`, and `# @internalPort` comment annotations, and the parser is a state machine that reconstructs the structure from them. Two consequences worth knowing:
 
@@ -83,7 +82,7 @@ Two models, and the interesting one is not a config format any parser handles.
 
 The file always carries the SOCKS port, the data directory, and the control socket. Beyond that it holds the onion services — keyed by package, host, and an index that is **never reused after a deletion**, because the index is a directory path containing key material — and the relay settings when a relay is enabled.
 
-`.watchdog.json` holds two booleans that have to outlive a restart: whether a wipe is queued, and whether the watchdog has already wiped during the current outage.
+The watchdog's state — whether a wipe is queued, and whether it has already wiped during the current outage — is two flag files beside the torrc, `.wipe-requested` and `.auto-wiped`. Present means set; there is nothing inside them to parse, and creating or removing one is atomic, so the health check and the Reset Tor Connection action can never tear or overwrite each other's write.
 
 ## Dependencies
 
@@ -144,6 +143,7 @@ Turns this node into a Tor relay or bridge, and sets its nickname, contact info,
 - **A relay contributes your bandwidth to the network.** The relay is configured to never act as an exit.
 - **Bandwidth rate and burst are in KB/s, and burst must be at least the rate.** Tor rejects a relay below 75 KB/s or a burst below the rate, so the form enforces both. The `torrc` lines may carry either `KBytes` or `MBytes`; both read back in KB/s.
 - **The relay identity is separate from your onion addresses.** It lives under `keys/` and survives the recovery wipe, so a relay keeps its fingerprint and its accumulated reputation.
+- **The relay shares the Tor process with the onion services.** Tor advises against that combination and logs `Tor is currently configured as a relay and a hidden service` whenever both are configured. A `HiddenServiceDir` exists only for an address attached to an interface, so a server meant to be a relay or bridge only clears the warning by removing its `.onion` addresses — the StartOS UI's included.
 
 ### Reset Tor Connection
 
@@ -202,6 +202,7 @@ Only the `tor` volume is copied — `sdk.Backups.ofVolumes('tor')`.
 6. **The SOCKS proxy is not exported** and is reachable only over loopback and the LXC bridge, never the LAN.
 7. **The relay never acts as an exit.**
 8. **The health check can restart the service on its own.** That is the watchdog working as intended, not a fault.
+9. **The relay and the onion services run in one Tor process**, which Tor warns about whenever both are configured. A relay-only server is one with no `.onion` addresses.
 
 ---
 
@@ -222,7 +223,9 @@ volumes:
   startos: host side (one-time onion-address import)
 file_models:
   - /var/lib/tor/torrc # custom serializer/parser; annotation comments are structural
-  - /var/lib/tor/.watchdog.json
+flag_files: # present = set
+  - /var/lib/tor/.wipe-requested
+  - /var/lib/tor/.auto-wiped
 startos_managed_env_vars: []
 dependencies: []
 interfaces:
