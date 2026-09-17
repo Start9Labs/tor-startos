@@ -7,7 +7,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
 
   // Before any daemon exists, so a queued wipe can't be undone by a running Tor
   // flushing its in-memory state back to disk.
-  const wipes = await applyPendingWipe(effects)
+  const wipes = await applyPendingWipe()
 
   const torSub = sdk.SubContainer.of(
     effects,

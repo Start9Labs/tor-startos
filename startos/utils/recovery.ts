@@ -1,10 +1,29 @@
-import { readdir, rm } from 'node:fs/promises'
+import { access, readdir, rm, writeFile } from 'node:fs/promises'
 import { T } from '@start9labs/start-sdk'
 import type { HealthCheckResult } from '@start9labs/start-sdk/lib/health/checkFns'
 import { probe, resetCircuits } from './control'
-import { WATCHDOG_FILE, watchdogState } from '../fileModels/watchdog'
 import { i18n } from '../i18n'
 import { sdk } from '../sdk'
+
+// Flag files, present = set: create and unlink are atomic, so no write can tear or race.
+const flag = (name: string) => {
+  const path = sdk.volumes.tor.subpath(name)
+  return {
+    name,
+    isSet: () =>
+      access(path).then(
+        () => true,
+        () => false,
+      ),
+    set: () => writeFile(path, ''),
+    clear: () => rm(path, { force: true }),
+  }
+}
+
+/** A wipe is queued for the next start, where no tor process holds the volume. */
+export const wipeRequested = flag('.wipe-requested')
+/** The watchdog already wiped during this outage; it does not wipe twice. */
+export const autoWiped = flag('.auto-wiped')
 
 /**
  * What survives a wipe: the config we generate, the onion service keys that
@@ -22,7 +41,8 @@ const PRESERVE = [
   'hidden_services',
   'keys',
   'control.sock',
-  WATCHDOG_FILE,
+  wipeRequested.name,
+  autoWiped.name,
 ]
 
 /** Tor must be unhealthy this long before the watchdog does anything at all. */
@@ -61,21 +81,20 @@ async function wipeNetworkState(): Promise<string[]> {
  * pending flag is cleared only once the wipe succeeds, so a failure part-way
  * through retries on the next start rather than leaving Tor half-wiped.
  */
-export async function applyPendingWipe(effects: T.Effects): Promise<boolean> {
-  const state = await watchdogState.read().once()
-  if (!state?.wipeRequested) return state?.autoWiped ?? false
-
-  const removed = await wipeNetworkState()
-  console.info(
-    `Wiped Tor network state: ${removed.join(', ') || '(nothing to remove)'}`,
-  )
-  await watchdogState.merge(effects, { wipeRequested: false })
-  return state.autoWiped
+export async function applyPendingWipe(): Promise<boolean> {
+  if (await wipeRequested.isSet()) {
+    const removed = await wipeNetworkState()
+    console.info(
+      `Wiped Tor network state: ${removed.join(', ') || '(nothing to remove)'}`,
+    )
+    await wipeRequested.clear()
+  }
+  return autoWiped.isSet()
 }
 
 /** Queues a wipe for the next start. The caller restarts the service. */
-export async function requestWipe(effects: T.Effects) {
-  await watchdogState.merge(effects, { wipeRequested: true })
+export function requestWipe() {
+  return wipeRequested.set()
 }
 
 /**
@@ -92,7 +111,7 @@ export async function requestWipe(effects: T.Effects) {
  * isn't stale state — most likely the box has no working internet — so the
  * watchdog stops and leaves the health check reporting the failure.
  */
-export function watchdog(effects: T.Effects, autoWiped: boolean) {
+export function watchdog(effects: T.Effects, wiped: boolean) {
   let unhealthySince: number | null = null
   let lastProgress: number | null = null
   let attempts = 0
@@ -113,9 +132,9 @@ export function watchdog(effects: T.Effects, autoWiped: boolean) {
       unhealthySince = null
       attempts = 0
       exhausted = false
-      if (autoWiped) {
-        await watchdogState.merge(effects, { autoWiped: false })
-        autoWiped = false
+      if (wiped) {
+        await autoWiped.clear()
+        wiped = false
       }
       return { result: 'success', message: i18n('Tor is running') }
     }
@@ -145,18 +164,18 @@ export function watchdog(effects: T.Effects, autoWiped: boolean) {
         )
         nextAttemptAt = now + RETRY_MS[attempts]
         attempts += 1
-      } else if (!autoWiped) {
+      } else if (!wiped) {
         console.warn(
           'Dropping entry nodes did not recover Tor — wiping cached network state and restarting',
         )
-        autoWiped = true
+        wiped = true
         // Holds off while the service tears down, and retries if the restart
         // never lands.
         nextAttemptAt = now + STALL_MS
-        await watchdogState.merge(effects, {
-          wipeRequested: true,
-          autoWiped: true,
-        })
+        // Request first: a crash between the two costs one extra wipe, not a
+        // skipped one.
+        await wipeRequested.set()
+        await autoWiped.set()
         await sdk.restart(effects)
       } else {
         // Already wiped this outage and Tor is still broken, so the cause isn't
