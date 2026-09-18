@@ -14,17 +14,20 @@ export const exportUrls = sdk.plugin.url.setupExportedUrls(
     const onionServices =
       (await torrc.read((t) => t.onionServices).const(effects)) || {}
 
-    // Phase 1: Remove onion service entries whose target interface no longer exists
+    // Phase 1: Remove onion service entries whose target package no longer exists
     const cleaned = structuredClone(onionServices)
     const removed: string[] = []
+    const pending = new Set<string>()
 
     for (const [packageId, hosts] of Object.entries(cleaned)) {
       if (!hosts) continue
 
       for (const [hostId, services] of Object.entries(hosts)) {
-        // Prune only on a confirmed-gone host. `sdk.host.get` returns null when
-        // the host no longer exists; a thrown lookup (e.g. a legacy entry the
-        // OS can't resolve) keeps the entry and its key material.
+        // A missing host is a package that was uninstalled — or one whose
+        // restore has not bound it yet: a batch restore writes every package's
+        // entry before any of them inits. Only the package's absence proves an
+        // uninstall. A thrown lookup (e.g. a legacy entry the OS can't resolve)
+        // keeps the entry and its key material.
         //
         // Map to existence before `.const()`: Phase 2's `exportUrl` mutates the
         // target host (its exported-URL set), which this watch observes.
@@ -43,6 +46,23 @@ export const exportUrls = sdk.plugin.url.setupExportedUrls(
           continue
         }
         if (hostExists) continue // host still exists — keep the onion
+
+        // Read once: a status watch would re-fire on every health tick of the
+        // target, and the host watch above already fires when the host arrives.
+        let installed: boolean
+        try {
+          installed =
+            (await sdk.getStatus(effects, { packageId }).once()) !== null
+        } catch (e) {
+          console.warn(
+            `Skipping cleanup for ${packageId}/${hostId}: ${String(e)}`,
+          )
+          continue
+        }
+        if (installed) {
+          pending.add(`${packageId}/${hostId}`)
+          continue
+        }
 
         for (const index of Object.keys(services ?? {})) {
           await rm(sdk.volumes.tor.subpath(hsDir(packageId, hostId, index)), {
@@ -78,10 +98,17 @@ export const exportUrls = sdk.plugin.url.setupExportedUrls(
       )
     }
 
-    // Phase 2: Export URLs for all surviving entries
+    if (pending.size) {
+      console.info(
+        `Keeping onion services whose host is not bound yet: ${[...pending].join(', ')}`,
+      )
+    }
+
+    // Phase 2: Export URLs for all surviving entries whose host exists
     for (const [packageId, hosts] of Object.entries(cleaned)) {
       if (!hosts) continue
       for (const [hostId, services] of Object.entries(hosts)) {
+        if (pending.has(`${packageId}/${hostId}`)) continue
         for (const [i, svc] of Object.entries(services ?? {})) {
           const hostnameFile = FileHelper.string({
             base: sdk.volumes.tor,
