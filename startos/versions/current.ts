@@ -1,36 +1,15 @@
-import { readFile, rm } from 'node:fs/promises'
-import { VersionInfo, z } from '@start9labs/start-sdk'
-import { sdk } from '../sdk'
-import { autoWiped, wipeRequested } from '../utils/recovery'
-
-const legacyWatchdogShape = z.object({
-  wipeRequested: z.boolean().catch(false),
-  autoWiped: z.boolean().catch(false),
-})
+import { VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '0.4.9.12:2',
+  version: '0.4.9.12:3',
   releaseNotes: {
-    en_US: `- \`start-cli package attach tor\` now opens a shell in the Tor container.
-- Tor starts after a power cut during its automatic recovery, and Reset Tor Connection takes effect even when run right after one.`,
-    es_ES: `- \`start-cli package attach tor\` ahora abre un shell en el contenedor de Tor.
-- Tor arranca tras un corte de energía durante su recuperación automática, y Restablecer la conexión de Tor surte efecto incluso si se ejecuta justo después de una.`,
-    de_DE: `- \`start-cli package attach tor\` öffnet jetzt eine Shell im Tor-Container.
-- Tor startet nach einem Stromausfall während seiner automatischen Wiederherstellung, und „Tor-Verbindung zurücksetzen“ wirkt auch direkt nach einer solchen.`,
-    pl_PL: `- \`start-cli package attach tor\` otwiera teraz powłokę w kontenerze Tora.
-- Tor uruchamia się po utracie zasilania w trakcie automatycznego odzyskiwania, a Zresetuj połączenie Tor działa nawet uruchomione tuż po nim.`,
-    fr_FR: `- \`start-cli package attach tor\` ouvre désormais un shell dans le conteneur Tor.
-- Tor démarre après une coupure de courant survenue pendant sa récupération automatique, et Réinitialiser la connexion Tor prend effet même lancé juste après l'une d'elles.`,
+    en_US: `Onion addresses survive a batch restore in which Tor comes up before the service they belong to.`,
+    es_ES: `Las direcciones onion sobreviven a una restauración en lote en la que Tor arranca antes que el servicio al que pertenecen.`,
+    de_DE: `Onion-Adressen überstehen eine Sammelwiederherstellung, bei der Tor vor dem Dienst hochkommt, zu dem sie gehören.`,
+    pl_PL: `Adresy onion przetrwają zbiorcze przywracanie, w którym Tor uruchamia się przed usługą, do której należą.`,
+    fr_FR: `Les adresses onion survivent à une restauration groupée où Tor démarre avant le service auquel elles appartiennent.`,
   },
   migrations: {
-    up: async () => {
-      const legacy = sdk.volumes.tor.subpath('.watchdog.json')
-      const state = await readFile(legacy, 'utf8')
-        .then((raw) => legacyWatchdogShape.parse(JSON.parse(raw)))
-        .catch(() => ({ wipeRequested: false, autoWiped: false }))
-      if (state.wipeRequested) await wipeRequested.set()
-      if (state.autoWiped) await autoWiped.set()
-      await rm(legacy, { force: true })
-    },
+    up: async ({ effects }) => {},
   },
 })
