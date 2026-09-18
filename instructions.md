@@ -14,6 +14,7 @@
 ## Warnings
 
 - **Uninstalling Tor permanently deletes all onion service keys and `.onion` addresses.** Any service reachable through one of those addresses will lose it. Make a backup first if you want to keep your addresses.
+- **Restore Tor together with the services that use its `.onion` addresses, or after them — never before.** Restored on its own, Tor treats an address whose service is not installed as abandoned and deletes its key. Selecting Tor and those services in the same restore is safe whichever order they come up in.
 
 ## Using Tor
 
