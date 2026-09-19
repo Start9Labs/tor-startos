@@ -74,6 +74,37 @@ export async function resetCircuits(): Promise<boolean> {
   return (await send('DROPGUARDS', 'DROPTIMEOUTS', 'SIGNAL NEWNYM')) !== null
 }
 
+export type RelayStatus = {
+  /**
+   * Tor's self-test found every ORPort in its current descriptor reachable.
+   * Vacuously true while Tor has no descriptor yet, so read it with `published`.
+   */
+  reachable: boolean
+  /** A directory authority accepted the descriptor Tor last uploaded. */
+  published: boolean
+  /** Tor knows an IPv6 address to publish, so an IPv6 ORPort is in play. */
+  ipv6: boolean
+}
+
+/**
+ * What Tor's self-test says about the relay's OR port, the test that gates
+ * publishing the relay descriptor. Resolves to null when Tor isn't answering
+ * its control socket.
+ */
+export async function relayStatus(): Promise<RelayStatus | null> {
+  const reply = await send(
+    'GETINFO status/reachability-succeeded/or',
+    'GETINFO status/accepted-server-descriptor',
+    'GETINFO address/v6',
+  )
+  if (reply === null) return null
+  return {
+    reachable: /status\/reachability-succeeded\/or=1/.test(reply),
+    published: /status\/accepted-server-descriptor=1/.test(reply),
+    ipv6: /address\/v6=\S/.test(reply),
+  }
+}
+
 /** Signals Tor to re-read torrc in place, avoiding a full daemon restart. */
 export async function reloadConfig(): Promise<void> {
   await send('SIGNAL RELOAD')

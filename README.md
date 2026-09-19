@@ -79,6 +79,7 @@ One model, and it is not a config format any parser handles.
 
 - **A hand edit does not survive.** The next write regenerates the file from the parsed structure, and anything the parser does not understand is dropped.
 - **Those comments are load-bearing.** Stripping them loses the package id, host id, and upstream port behind each onion service.
+- **The relay's advertised address and port are derived, not configured.** An init handler re-asserts them from the OR binding on every init and whenever the binding's Public addresses or assigned port change: an `Address` line when exactly one gateway has the Public IPv4 address enabled, an `ORPort <assigned> NoListen` / `ORPort <configured> NoAdvertise` pair when StartOS assigned a different external port, and `IPv4Only` on the ORPort while no public IPv6 address is enabled. **Configure Relay** never sets them, and changing the OR port drops them until the handler derives them again.
 
 The file always carries the SOCKS port, the data directory, and the control socket. Beyond that it holds the onion services — keyed by package, host, and an index that is **never reused after a deletion**, because the index is a directory path containing key material — and the relay settings when a relay is enabled.
 
@@ -100,9 +101,11 @@ The SOCKS proxy is a binding with **no exported interface**, and that is deliber
 | ----------------- | ---- | ---- | ---------------------- | ------------------ |
 | Tor Relay OR Port | `or` | p2p  | The configured OR port | A relay is enabled |
 
-**The relay port is the exception to everything else here**: it is exported precisely so it can be reached from the public internet, which is what running a relay means. Its binding is `secure: { ssl: false }` — the OR protocol carries its own TLS, so StartOS treats it like any self-securing p2p port: LAN and `.local` addresses serve as soon as the interface exists, while each gateway's **Public** address is offered but stays off until the user enables it. The listener inside the container is IPv4-only, so an IPv6 address exposed to the WAN has nothing behind it.
+**The relay port is the exception to everything else here**: it is exported precisely so it can be reached from the public internet, which is what running a relay means. Its binding is `secure: { ssl: false }` — the OR protocol carries its own TLS, so StartOS treats it like any self-securing p2p port: LAN and `.local` addresses serve as soon as the interface exists, while each gateway's **Public** address is offered but stays off until the user enables it.
 
-Public reachability is a two-sided contract. Enabling the Public address on a gateway opens the inbound path there — StartTunnel publishes the port automatically, a home router needs a manual forward — while the address the relay _announces_ comes from what the Tor directory authorities observe on its **outbound** connections, since the generated `torrc` sets no `Address` line. The two must be the same gateway, or the relay announces an IP nobody forwards. A persistent `has not managed to confirm reachability for its ORPort(s)` warning means that inbound path is missing or on the wrong gateway; it is not a bootstrap problem, and **Reset Tor Connection** will not fix it. Two subtler causes of the same warning: the Public enable is stored against the exact address and port, so changing the OR port or the gateway's public IP drops it until re-enabled; and if another service already holds the OR port's external slot, StartOS assigns a different external port while Tor still advertises the configured one — the interface page shows the port actually assigned.
+Public reachability needs the inbound path and the advertised address to agree. Enabling the Public address on a gateway opens the inbound path there: StartTunnel publishes the port automatically, and on a home connection StartOS asks the router for the forward (a router that refuses needs a manual one). The package keeps the advertised side in step with that — see [File Models](#file-models): with the Public IPv4 address enabled on exactly one gateway, `torrc` pins `Address` to it, and when another service already held the OR port's external slot, the relay advertises the port StartOS actually assigned. With Public enabled on more than one gateway nothing is pinned, and Tor advertises the address the directory authorities see on its **outbound** connections, which then has to be one of those gateways. A persistent `has not managed to confirm reachability for its ORPort(s)` warning, which the Relay Reachability health check surfaces in the UI, means the inbound path is missing or is on a gateway the relay does not advertise; it is not a bootstrap problem, and **Reset Tor Connection** will not fix it. The Public enable is stored against the exact address and port, so changing the OR port or the gateway's public IP turns it off until it is re-enabled.
+
+**The package gives the relay no IPv6 address.** A bare `ORPort` is an IPv6 ORPort as well, and Tor cannot see the server's addresses from inside its container, so it would log `Unable to find IPv6 address for ORPort` once an hour; while no public IPv6 address is enabled on the interface the package writes `IPv4Only` and the notice never appears. With a public IPv6 address enabled the ORPort is left dual-stack and the address is left to Tor's own discovery, so unless Tor finds one the notice returns and the relay publishes over IPv4 alone — it is a notice, not a fault. The package deliberately pins no IPv6 address: Tor omits an IPv6 address it discovered itself when that address fails the self-test, but refuses to publish any descriptor while a _configured_ one fails it, which would take a working IPv4 relay off the network.
 
 ### The URL plugin
 
@@ -137,9 +140,9 @@ Not user-facing. These are the plugin's table actions — StartOS invokes them w
 Turns this node into a Tor relay or bridge, and sets its nickname, contact info, OR port, and bandwidth limits.
 
 - **What it changes:** the `relay` section of `torrc`, and through it the presence of the OR interface.
-- **Cost:** seconds, then a config reload.
+- **Cost:** seconds, then a config reload — except that changing the OR port of a relay that is already on **restarts Tor**, interrupting every onion service for the time Tor takes to bootstrap. Tor tests an ORPort only when it starts as a relay or its address changes; reloaded onto a new port it keeps the old port's verdict, and would publish, and the Relay Reachability check would report as reachable, a port nothing has tested.
 - **Repeat safety:** idempotent; the form is pre-filled.
-- **Enabling a relay is not the whole job.** It creates the OR interface; the port reaches the internet only once its **Public** address is enabled — see Interfaces above. A relay whose reachability was never confirmed contributes nothing and publishes no descriptor.
+- **Enabling a relay is not the whole job.** It creates the OR interface; the port reaches the internet only once its **Public** address is enabled — see Interfaces above. A relay whose reachability was never confirmed contributes nothing and publishes no descriptor. The Relay Reachability health check shows whether it has been confirmed.
 - **A relay contributes your bandwidth to the network.** The relay is configured to never act as an exit.
 - **Bandwidth rate and burst are in KB/s, and burst must be at least the rate.** Tor rejects a relay below 75 KB/s or a burst below the rate, so the form enforces both. The `torrc` lines may carry either `KBytes` or `MBytes`; both read back in KB/s.
 - **The relay identity is separate from your onion addresses.** It lives under `keys/` and survives the recovery wipe, so a relay keeps its fingerprint and its accumulated reputation.
@@ -162,13 +165,14 @@ None. This package raises no tasks, so the service is never held on a prompt and
 
 ## Health Checks
 
-One check, and it is also the recovery mechanism.
+Two checks. `tor` is also the recovery mechanism; `relay` only reports.
 
-| Check | Displayed         | Method                                                                  |
-| ----- | ----------------- | ----------------------------------------------------------------------- |
-| `tor` | "Tor SOCKS Proxy" | Tor's own control socket — bootstrap phase, circuit state, and dormancy |
+| Check   | Displayed            | Method                                                                  |
+| ------- | -------------------- | ----------------------------------------------------------------------- |
+| `tor`   | "Tor SOCKS Proxy"    | Tor's own control socket — bootstrap phase, circuit state, and dormancy |
+| `relay` | "Relay Reachability" | Tor's own control socket — the result of the OR port self-test          |
 
-It reads Tor's real state rather than probing a port, so the message says what Tor is actually doing: a bootstrap percentage with Tor's own summary line while starting, and a distinct message for "bootstrapped but cannot build circuits". **Dormant counts as healthy** — Tor drops circuits when nothing has asked for one in a long time and wakes on the next request.
+The `tor` check reads Tor's real state rather than probing a port, so the message says what Tor is actually doing: a bootstrap percentage with Tor's own summary line while starting, and a distinct message for "bootstrapped but cannot build circuits". **Dormant counts as healthy** — Tor drops circuits when nothing has asked for one in a long time and wakes on the next request.
 
 **It polls once a second while unhealthy instead of the default thirty**, because Tor bootstraps in seconds and a thirty-second poll left the UI showing 0% long after Tor had finished.
 
@@ -182,6 +186,17 @@ Tor pins an entry node and keeps retrying it — deliberately, to resist guard-d
 4. **It wipes at most once per outage.** If Tor is still broken afterwards the cause is not stale state — most likely the server has no working internet — and the check says so and stops rather than restarting in a loop.
 
 A healthy reading resets the whole ladder.
+
+### Relay reachability
+
+Disabled while relay mode is off. With relay mode on it asks Tor every 30 seconds for `status/reachability-succeeded/or` (Tor's own test of the OR port from outside, the same test that gates publishing the relay descriptor), `status/accepted-server-descriptor`, and `address/v6`.
+
+- **Success:** Tor has confirmed the OR port is reachable from the internet, and a directory authority has accepted the relay's descriptor. Both are required because Tor's reachability flag reads true until it has built a descriptor at all.
+- **Loading** for the first 20 minutes of unreachable readings, which is as long as Tor itself waits before warning — or 45 minutes when Tor knows an IPv6 address, because Tor keeps reporting the OR port unreachable until one of its 20-minute checks drops an unreachable auto-discovered IPv6 address and publishes over IPv4 alone. The clock starts at the first unreachable reading, so turning relay mode on in a running Tor gets the same allowance as a restart, and it starts over whenever the OR port or the advertised address changes, because Tor then tests from scratch.
+- **Failure, at once,** while no public address is enabled on the OR Port interface: nothing can reach the relay, whatever Tor reports. This is checked against the binding because Tor never revisits a test it has passed until its address changes, so its own verdict stays true after the Public address is turned off.
+- **Failure** after the allowance otherwise: the inbound path is missing, or it is on a gateway the relay does not advertise — see [Network Access and Interfaces](#network-access-and-interfaces). Restarting Tor or running **Reset Tor Connection** does not change it.
+
+The check only reads state; it never restarts the service.
 
 ## Backups and Restore
 
@@ -201,8 +216,10 @@ Only the `tor` volume is copied — `sdk.Backups.ofVolumes('tor')`.
 5. **An onion whose interface has no bridge-reachable address at all is logged, not repaired** — there is nothing to point it at, so the address has to be re-added once the interface is back.
 6. **The SOCKS proxy is not exported** and is reachable only over loopback and the LXC bridge, never the LAN.
 7. **The relay never acts as an exit.**
-8. **The health check can restart the service on its own.** That is the watchdog working as intended, not a fault.
+8. **The `tor` health check can restart the service on its own.** That is the watchdog working as intended, not a fault.
 9. **The relay and the onion services run in one Tor process**, which Tor warns about whenever both are configured. A relay-only server is one with no `.onion` addresses.
+10. **With the Public address enabled on more than one gateway, the relay's address is not pinned.** Tor advertises the address its outbound traffic comes from, and that has to be one of those gateways.
+11. **The package never gives the relay an IPv6 address**, and `torrc` hand edits do not survive. The relay advertises IPv6 only if a public IPv6 address is enabled and Tor discovers it on its own.
 
 ---
 
@@ -238,6 +255,7 @@ actions:
 tasks: []
 health_checks:
   - tor # displayed "Tor SOCKS Proxy"; also the self-recovery watchdog
+  - relay # displayed "Relay Reachability"; disabled unless relay mode is on
 ```
 
 > **For dependent packages:** the SOCKS proxy is an unexported binding on host

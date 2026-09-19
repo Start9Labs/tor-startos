@@ -45,7 +45,9 @@ export const relayInputSpec = InputSpec.of({
   }),
   orPort: Value.number({
     name: i18n('OR Port'),
-    description: null,
+    description: i18n(
+      'Changing the OR port while the relay is on restarts Tor, so that it tests the new port.',
+    ),
     required: false,
     default: 9001,
     min: 1,
@@ -107,6 +109,7 @@ export const configureRelay = sdk.Action.withInput(
         i18n('Bandwidth Burst must be at least the Bandwidth Rate.'),
       )
     }
+    const before = await torrc.read((s) => s.relay).once()
     await torrc.merge(effects, {
       relay: {
         enabled: input.enabled,
@@ -118,5 +121,15 @@ export const configureRelay = sdk.Action.withInput(
         bandwidthBurst: input.bandwidthBurst,
       },
     })
+    // Tor tests an ORPort only when it starts as a relay or its address
+    // changes. A reload onto a new port keeps the old port's verdict, so the
+    // relay would publish, and report as reachable, a port nobody has tested.
+    if (
+      before?.enabled &&
+      input.enabled &&
+      (input.orPort ?? 9001) !== before.orPort
+    ) {
+      await sdk.restart(effects)
+    }
   },
 )

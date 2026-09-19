@@ -50,6 +50,17 @@ const shape = z.object({
     bandwidthRate: 1024,
     bandwidthBurst: 2048,
   }),
+  // Not user configuration: what the relay advertises, derived from the OR
+  // binding by init/advertiseRelay. `orPort` is the configured port it was
+  // derived for, so changing the OR port drops it until it is derived again.
+  advertise: z
+    .object({
+      orPort: z.number().nullable().catch(null),
+      address: z.string().nullable().catch(null),
+      port: z.number().nullable().catch(null),
+      ipv4Only: z.boolean().catch(false),
+    })
+    .catch({ orPort: null, address: null, port: null, ipv4Only: false }),
 })
 
 export type TorrcConfig = z.infer<typeof shape>
@@ -111,7 +122,20 @@ function toFile(config: TorrcConfig): string {
 
   const relay = config.relay
   if (relay?.enabled) {
-    lines.push(`ORPort ${relay.orPort}`)
+    const advertise =
+      config.advertise?.orPort === relay.orPort ? config.advertise : null
+    // StartOS may assign the binding a different external port than the one
+    // Tor listens on: advertise the assigned port, listen on the configured one.
+    // A bare ORPort is an IPv6 ORPort too, and with no IPv6 address to publish
+    // Tor logs a notice about it every hour.
+    const family = advertise?.ipv4Only ? ' IPv4Only' : ''
+    if (advertise?.port && advertise.port !== relay.orPort) {
+      lines.push(`ORPort ${advertise.port} NoListen${family}`)
+      lines.push(`ORPort ${relay.orPort} NoAdvertise${family}`)
+    } else {
+      lines.push(`ORPort ${relay.orPort}${family}`)
+    }
+    if (advertise?.address) lines.push(`Address ${advertise.address}`)
     if (relay.nickname) lines.push(`Nickname ${relay.nickname}`)
     if (relay.contactInfo) lines.push(`ContactInfo ${relay.contactInfo}`)
     if (relay.bridge) lines.push('BridgeRelay 1')
@@ -145,6 +169,7 @@ function fromFile(raw: string): unknown {
       bandwidthRate: 1024,
       bandwidthBurst: 2048,
     },
+    advertise: { orPort: null, address: null, port: null, ipv4Only: false },
   }
 
   const lines = raw.split('\n')
@@ -157,6 +182,7 @@ function fromFile(raw: string): unknown {
   > = {}
   let nextSslInternalPort: number | null = null
   let nextInternalPort: number | null = null
+  let listens = false
 
   function flushCurrent() {
     if (
@@ -235,10 +261,20 @@ function fromFile(raw: string): unknown {
     }
 
     let m
-    if ((m = trimmed.match(/^ORPort (\d+)/))) {
+    if ((m = trimmed.match(/^ORPort (\d+)(.*)/))) {
       flushCurrent()
       res.relay.enabled = true
-      res.relay.orPort = parseInt(m[1], 10)
+      const flags = m[2].split(/\s+/)
+      // A NoListen line carries the advertised port; the port Tor listens on
+      // is written without it.
+      if (flags.includes('NoListen')) res.advertise.port = parseInt(m[1], 10)
+      else {
+        res.relay.orPort = parseInt(m[1], 10)
+        listens = true
+      }
+      if (flags.includes('IPv4Only')) res.advertise.ipv4Only = true
+    } else if ((m = trimmed.match(/^Address (\S+)/))) {
+      res.advertise.address = m[1]
     } else if ((m = trimmed.match(/^Nickname (.+)/))) {
       res.relay.nickname = m[1]
     } else if ((m = trimmed.match(/^ContactInfo (.+)/))) {
@@ -253,6 +289,18 @@ function fromFile(raw: string): unknown {
   }
 
   flushCurrent()
+  // A NoListen line that lost its listening partner still names the relay's port.
+  if (res.advertise.port !== null && !listens) {
+    res.relay.orPort = res.advertise.port
+    res.advertise.port = null
+  }
+  if (
+    res.advertise.address !== null ||
+    res.advertise.port !== null ||
+    res.advertise.ipv4Only
+  ) {
+    res.advertise.orPort = res.relay.orPort
+  }
 
   return res
 }
