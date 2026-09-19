@@ -127,8 +127,7 @@ export const configureRelay = sdk.Action.withInput(
     if (
       before?.enabled &&
       input.enabled &&
-      input.orPort != null &&
-      input.orPort !== before.orPort
+      (input.orPort ?? 9001) !== before.orPort
     ) {
       await sdk.restart(effects)
     }
