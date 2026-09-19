@@ -38,6 +38,13 @@ const dict = {
   'Tor requires at least 75 KB/s for a relay.': 34,
   'Must be at least the Bandwidth Rate.': 35,
   'Bandwidth Burst must be at least the Bandwidth Rate.': 36,
+  'Relay Reachability': 37,
+  'Relay mode is off': 38,
+  'Reachable from the internet': 39,
+  'Testing whether the relay is reachable from the internet': 40,
+  'Not reachable from the internet. Enable the Public address on the Tor Relay OR Port interface.': 41,
+  'Tor could not reach the relay from the internet. Check that the OR port is forwarded to this server, and that the Public address is enabled on only one connection.': 42,
+  'Changing the OR port while the relay is on restarts Tor, so that it tests the new port.': 43,
 } as const
 
 export type I18nKey = keyof typeof dict

@@ -1,5 +1,6 @@
 import { i18n } from './i18n'
 import { applyPendingWipe, watchdog } from './utils/recovery'
+import { relayReachability } from './utils/relay'
 import { sdk } from './sdk'
 
 export const main = sdk.setupMain(async ({ effects }) => {
@@ -59,6 +60,16 @@ export const main = sdk.setupMain(async ({ effects }) => {
           }),
         },
         requires: ['chown'],
+      })
+      // Always present, and disabled while relay mode is off, so turning relay
+      // mode on never has to restart Tor to add it.
+      .addHealthCheck('relay', {
+        ready: {
+          display: i18n('Relay Reachability'),
+          fn: relayReachability(effects),
+          trigger: sdk.trigger.cooldownTrigger(30_000),
+        },
+        requires: ['tor'],
       })
   )
 })
