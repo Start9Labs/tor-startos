@@ -78,7 +78,7 @@ export const reconcileOnionTargets = sdk.setupOnInit(async (effects) => {
     console.warn(
       `Onion services whose interface no longer serves the mode they were created with, so they cannot be retargeted: ${unservable.join(
         ', ',
-      )}. Re-add the address from the interface's Tor section to replace them.`,
+      )}. Delete them with the Delete Onion Addresses action, or re-add the address from the interface's Tor section to replace them.`,
     )
   }
 

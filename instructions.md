@@ -24,6 +24,10 @@ Open the specific interface of the other service you want to expose over Tor. On
 
 Your `.onion` addresses look after themselves once they exist. If a service changes the port or the encryption it is served on, Tor re-points the address the next time it starts, so it keeps answering without you doing anything and the address itself never changes. An address whose interface has no reachable endpoint left is reported in the logs and otherwise left alone.
 
+### Removing a .onion address that no longer shows anywhere
+
+An address stays with the interface it was attached to. If that service changed its interface or port, or was reinstalled differently, the address can drop off every interface page while Tor keeps hosting it. Open Tor's **Actions** menu and run **Delete Onion Addresses**: it lists every `.onion` address the server hosts, marks the ones no longer attached to an interface, and deletes the ones you pick. Deleting is permanent — the key goes with the address.
+
 ### Tor is stuck connecting
 
 Tor enters the network through a small set of **entry nodes**, and it sticks with the ones it picked on purpose — hopping between entry points would make you easier to track. The downside is that if one of them goes bad, Tor keeps retrying it anyway: it stalls partway through connecting, or it connects but nothing loads. **Restarting Tor does not fix this**, because the entry node it picked is saved to disk and chosen again on the next start.
@@ -45,4 +49,4 @@ If Tor still can't connect after a reset, its health status will say so, and the
 
 Tor's **Relay Reachability** health status shows when the Tor network can reach your relay. The first test takes up to 20 minutes; once it passes, the relay appears in [Relay Search](https://metrics.torproject.org/rs.html) within a few hours. If it says the relay isn't reachable, the port isn't reaching your server: check that the Public address is still enabled and, on a home connection, your router. Keep the Public address enabled on just one connection — with more than one, your relay announces whichever of them Tor's outgoing traffic uses. If you change the OR port later, or your public IP changes, enable the Public address again. Changing the OR port while the relay is on restarts Tor so that it tests the new port, which briefly interrupts your `.onion` addresses.
 
-Tor advises against running a relay and `.onion` addresses in the same Tor process, and logs a warning whenever both are configured. If this server is meant to be a relay or bridge only, remove the `.onion` addresses from your services — the StartOS UI's included, under **System** — and the warning goes away.
+Tor advises against running a relay and `.onion` addresses in the same Tor process, and logs a warning whenever both are configured. If this server is meant to be a relay or bridge only, remove the `.onion` addresses from your services — the StartOS UI's included, under **System** — and the warning goes away. If it persists, run **Delete Onion Addresses** from Tor's **Actions** menu: it shows every address Tor still hosts, including any that no longer appears on an interface page.

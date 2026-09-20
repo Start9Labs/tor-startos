@@ -81,7 +81,7 @@ One model, and it is not a config format any parser handles.
 - **Those comments are load-bearing.** Stripping them loses the package id, host id, and upstream port behind each onion service.
 - **The relay's advertised address and port are derived, not configured.** An init handler re-asserts them from the OR binding on every init and whenever the binding's Public addresses or assigned port change: an `Address` line when exactly one gateway has the Public IPv4 address enabled, an `ORPort <assigned> NoListen` / `ORPort <configured> NoAdvertise` pair when StartOS assigned a different external port, and `IPv4Only` on the ORPort while no public IPv6 address is enabled. **Configure Relay** never sets them, and changing the OR port drops them until the handler derives them again.
 
-The file always carries the SOCKS port, the data directory, and the control socket. Beyond that it holds the onion services — keyed by package, host, and an index that is **never reused after a deletion**, because the index is a directory path containing key material — and the relay settings when a relay is enabled.
+The file always carries the SOCKS port, the data directory, and the control socket. `SocksPort 0.0.0.0:9050` binds every interface of the _container_, which has only loopback and the LXC bridge, so it is not a LAN exposure. Beyond that it holds the onion services — keyed by package, host, and an index that is **never reused after a deletion**, because the index is a directory path containing key material — and the relay settings when a relay is enabled.
 
 The watchdog's state — whether a wipe is queued, and whether it has already wiped during the current outage — is two flag files beside the torrc, `.wipe-requested` and `.auto-wiped`. Present means set; there is nothing inside them to parse, and creating or removing one is atomic, so the health check and the Reset Tor Connection action can never tear or overwrite each other's write.
 
@@ -109,7 +109,7 @@ Public reachability needs the inbound path and the advertised address to agree. 
 
 ### The URL plugin
 
-Tor registers itself as StartOS's `url-v0` plugin provider, which is how `.onion` addresses reach the rest of the system. On every init it exports the current set of onion URLs back to the packages they belong to, and in the same pass it prunes entries whose target package no longer exists — deleting the key material with them, since the address can never be reattached to anything. An entry whose host is missing while its package is still installed is kept and not exported: a batch restore writes every package's entry before any of them inits, and a host exists only once its package's own init binds it, which is what triggers the export.
+Tor registers itself as StartOS's `url-v0` plugin provider, which is how `.onion` addresses reach the rest of the system. On every init it exports the current set of onion URLs back to the packages they belong to, and in the same pass it prunes entries whose target package no longer exists — deleting the key material with them, since the address can never be reattached to anything. An entry whose host is missing while its package is still installed is kept and not exported: a batch restore writes every package's entry before any of them inits, and a host exists only once its package's own init binds it, which is what triggers the export. An entry the plugin cannot export — its host missing, or its binding gone from a host that still exists — stays a live `HiddenServiceDir` that no interface page shows; **Delete Onion Addresses** is the one place it can still be removed.
 
 That pruning only fires on a package StartOS confirms is gone. A lookup that throws leaves the entry and its keys alone, because "I could not resolve this" is not "this no longer exists."
 
@@ -121,19 +121,28 @@ Nothing to configure and nothing to reveal. Install writes a torrc, starts Tor, 
 
 The first start takes longer than later ones — Tor downloads a consensus and builds its first circuits, which is what the bootstrap percentage in the health check is reporting.
 
-**You do not add onion services by hand.** They arrive through the URL plugin when another service asks StartOS for a Tor address, which is why both onion actions are hidden.
+**You do not add onion services by hand.** They arrive through the URL plugin when another service asks StartOS for a Tor address, which is why the add and per-address delete actions are hidden.
 
 **An install carrying onion addresses from an older StartOS imports them once.** If a migration file is present, init derives each address from its key, writes the key material into place, and renames the file so it never runs twice. Keys that are not properly clamped are skipped rather than imported broken.
 
 ## Actions
 
-Four actions: two hidden ones the plugin drives, and two for you.
+Five actions: two hidden ones the plugin drives, and three for you.
 
 ### Add Onion Service / Delete Onion Service (hidden)
 
 Not user-facing. These are the plugin's table actions — StartOS invokes them when a service is given or loses a Tor address, and they are what write and remove the key material.
 
 - **Deleting is permanent.** The secret key is removed with the entry, so the `.onion` address can never be recovered or reassigned.
+
+### Delete Onion Addresses
+
+Lists every `.onion` address in `torrc` with the package and host it belongs to, marks the ones no longer attached to an interface, and deletes the selected entries with their key material.
+
+- **When to run it:** an address has to go and no interface page shows it — a service whose interface or port changed leaves its entry behind — or a relay-only server still logs the relay-and-hidden-service warning after every visible address is gone.
+- **What it changes:** removes the entries from `torrc` and deletes their `hidden_services/` directories. Tor reloads when `torrc` changes.
+- **Repeat safety:** deleting is permanent — the key is the address.
+- **Availability: any status.**
 
 ### Configure Relay
 
@@ -146,7 +155,7 @@ Turns this node into a Tor relay or bridge, and sets its nickname, contact info,
 - **A relay contributes your bandwidth to the network.** The relay is configured to never act as an exit.
 - **Bandwidth rate and burst are in KB/s, and burst must be at least the rate.** Tor rejects a relay below 75 KB/s or a burst below the rate, so the form enforces both. The `torrc` lines may carry either `KBytes` or `MBytes`; both read back in KB/s.
 - **The relay identity is separate from your onion addresses.** It lives under `keys/` and survives the recovery wipe, so a relay keeps its fingerprint and its accumulated reputation.
-- **The relay shares the Tor process with the onion services.** Tor advises against that combination and logs `Tor is currently configured as a relay and a hidden service` whenever both are configured. A `HiddenServiceDir` exists only for an address attached to an interface, so a server meant to be a relay or bridge only clears the warning by removing its `.onion` addresses — the StartOS UI's included.
+- **The relay shares the Tor process with the onion services.** Tor advises against that combination and logs `Tor is currently configured as a relay and a hidden service` whenever both are configured. A `HiddenServiceDir` exists only for an address attached to an interface, so a server meant to be a relay or bridge only clears the warning by removing its `.onion` addresses — the StartOS UI's included. An address no interface page shows any more is removed with **Delete Onion Addresses**.
 
 ### Reset Tor Connection
 
@@ -212,12 +221,12 @@ Only the `tor` volume is copied — `sdk.Backups.ofVolumes('tor')`.
 1. **`torrc` is generated and hand edits do not survive.** The annotation comments in it are structural, not documentation.
 2. **Onion services are not added by hand.** They come from other services through the URL plugin; the actions that create them are hidden.
 3. **Deleting an onion service is irreversible** — the key is the address.
-4. **Onion entries whose target package is gone are pruned automatically**, key material included. A host missing from a package that is still installed keeps its entry, unexported, until the host is back.
-5. **An onion whose interface has no bridge-reachable address at all is logged, not repaired** — there is nothing to point it at, so the address has to be re-added once the interface is back.
+4. **Onion entries whose target package is gone are pruned automatically**, key material included. A host missing from a package that is still installed keeps its entry, unexported, until the host is back or **Delete Onion Addresses** removes it.
+5. **An onion whose interface has no bridge-reachable address at all is logged, not repaired** — there is nothing to point it at, so the address has to be re-added once the interface is back, or deleted with **Delete Onion Addresses**.
 6. **The SOCKS proxy is not exported** and is reachable only over loopback and the LXC bridge, never the LAN.
 7. **The relay never acts as an exit.**
 8. **The `tor` health check can restart the service on its own.** That is the watchdog working as intended, not a fault.
-9. **The relay and the onion services run in one Tor process**, which Tor warns about whenever both are configured. A relay-only server is one with no `.onion` addresses.
+9. **The relay and the onion services run in one Tor process**, which Tor warns about whenever both are configured. A relay-only server is one with no `.onion` addresses; **Delete Onion Addresses** lists every one, attached to an interface or not.
 10. **With the Public address enabled on more than one gateway, the relay's address is not pinned.** Tor advertises the address its outbound traffic comes from, and that has to be one of those gateways.
 11. **The package never gives the relay an IPv6 address**, and `torrc` hand edits do not survive. The relay advertises IPv6 only if a public IPv6 address is enabled and Tor discovers it on its own.
 
@@ -250,6 +259,7 @@ interfaces:
 actions:
   - add-onion-service # hidden; driven by the url-v0 plugin
   - delete-onion-service # hidden; driven by the url-v0 plugin
+  - delete-onion-addresses
   - configure-relay
   - reset-connection # only-running
 tasks: []

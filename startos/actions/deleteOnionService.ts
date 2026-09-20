@@ -1,5 +1,5 @@
 import { rm } from 'fs/promises'
-import { hsDir, torrc } from '../fileModels/torrc'
+import { dropOnionService, hsDir, torrc } from '../fileModels/torrc'
 import { i18n } from '../i18n'
 import { sdk } from '../sdk'
 
@@ -74,25 +74,13 @@ export const deleteOnionService = sdk.Action.withInput(
 
       // If no ports remain, remove the entire entry and key material
       if (Object.values(svc.ports).every((v) => v === undefined)) {
-        ;(services as any)[key] = undefined
         await rm(sdk.volumes.tor.subpath(hsDir(packageId, hostId, key)), {
           recursive: true,
           force: true,
         })
+        dropOnionService(onionServices, packageId, hostId, key)
       }
       break
-    }
-
-    // Clean up empty host/package entries
-    if (Object.values(services).every((v) => v === undefined)) {
-      ;(onionServices[packageId] as any)[hostId] = undefined
-    }
-    if (
-      Object.values(onionServices[packageId] || {}).every(
-        (v) => v === undefined,
-      )
-    ) {
-      ;(onionServices as any)[packageId] = undefined
     }
 
     await torrc.merge(effects, { onionServices })

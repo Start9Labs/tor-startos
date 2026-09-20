@@ -70,6 +70,26 @@ export function hsDir(packageId: string, hostId: string, index: string) {
 }
 
 /**
+ * Marks an entry `undefined` in place, which `merge` drops from the file, and
+ * does the same to the host and package records it empties.
+ */
+export function dropOnionService(
+  onionServices: TorrcConfig['onionServices'],
+  packageId: string,
+  hostId: string,
+  index: string,
+) {
+  const hosts = onionServices[packageId]
+  const services = hosts?.[hostId]
+  if (!hosts || !services) return
+  ;(services as any)[index] = undefined
+  if (Object.values(services).every((v) => v === undefined))
+    (hosts as any)[hostId] = undefined
+  if (Object.values(hosts).every((v) => v === undefined))
+    (onionServices as any)[packageId] = undefined
+}
+
+/**
  * Returns the next sequential numeric key (as a string) for a record.
  * Gaps from deleted keys are intentionally NOT reused, since keys map to
  * HiddenServiceDir paths containing cryptographic key material.
