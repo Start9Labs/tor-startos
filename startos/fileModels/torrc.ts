@@ -3,10 +3,11 @@ import { sdk } from '../sdk'
 import { socksPort } from '../utils'
 
 const portInfoShape = z.object({
-  target: z.string(),
+  target: z.string().nullable(),
   ssl: z.boolean(),
   internalPort: z.number(),
 })
+type PortInfo = z.infer<typeof portInfoShape>
 
 export const onionServiceEntryShape = z
   .object({
@@ -70,6 +71,26 @@ export function hsDir(packageId: string, hostId: string, index: string) {
 }
 
 /**
+ * Marks an entry `undefined` in place, which `merge` drops from the file, and
+ * does the same to the host and package records it empties.
+ */
+export function dropOnionService(
+  onionServices: TorrcConfig['onionServices'],
+  packageId: string,
+  hostId: string,
+  index: string,
+) {
+  const hosts = onionServices[packageId]
+  const services = hosts?.[hostId]
+  if (!hosts || !services) return
+  ;(services as any)[index] = undefined
+  if (Object.values(services).every((v) => v === undefined))
+    (hosts as any)[hostId] = undefined
+  if (Object.values(hosts).every((v) => v === undefined))
+    (onionServices as any)[packageId] = undefined
+}
+
+/**
  * Returns the next sequential numeric key (as a string) for a record.
  * Gaps from deleted keys are intentionally NOT reused, since keys map to
  * HiddenServiceDir paths containing cryptographic key material.
@@ -88,6 +109,8 @@ export function nextKey(record: Record<string, unknown>): string {
  * Embeds `# @service`, `# @ssl`, and `# @internalPort` comment annotations so
  * fromFile() can reconstruct the structured data (packageId, hostId, SSL
  * status, upstream internal port) on read.
+ * A port with a null target is parked: its directive is written commented out,
+ * and so is the HiddenServiceDir once every port of the entry is.
  */
 function toFile(config: TorrcConfig): string {
   const lines: string[] = [
@@ -104,16 +127,23 @@ function toFile(config: TorrcConfig): string {
       if (!services) continue
       Object.entries(services).forEach(([index, svc]) => {
         if (!svc) return
-        if (Object.keys(svc.ports).length === 0) return
+        const ports = Object.entries(svc.ports).filter(
+          (e): e is [string, PortInfo] => !!e[1],
+        )
+        if (ports.length === 0) return
+        const served = ports.some(([, p]) => p.target !== null)
         lines.push(`# @service ${packageId} ${hostId}`)
         lines.push(
-          `HiddenServiceDir /var/lib/tor/${hsDir(packageId, hostId, index)}/`,
+          `${served ? '' : '#'}HiddenServiceDir /var/lib/tor/${hsDir(packageId, hostId, index)}/`,
         )
-        for (const [externalPort, portInfo] of Object.entries(svc.ports)) {
-          if (!portInfo) continue
+        for (const [externalPort, portInfo] of ports) {
           if (portInfo.ssl) lines.push(`# @ssl ${portInfo.internalPort}`)
           else lines.push(`# @internalPort ${portInfo.internalPort}`)
-          lines.push(`HiddenServicePort ${externalPort} ${portInfo.target}`)
+          lines.push(
+            portInfo.target === null
+              ? `#HiddenServicePort ${externalPort}`
+              : `HiddenServicePort ${externalPort} ${portInfo.target}`,
+          )
         }
         lines.push('')
       })
@@ -176,10 +206,7 @@ function fromFile(raw: string): unknown {
   let currentPackageId: string | null = null
   let currentHostId: string | null = null
   let currentIndex: string | null = null
-  let currentPorts: Record<
-    string,
-    { target: string; ssl: boolean; internalPort: number }
-  > = {}
+  let currentPorts: Record<string, PortInfo> = {}
   let nextSslInternalPort: number | null = null
   let nextInternalPort: number | null = null
   let listens = false
@@ -230,17 +257,21 @@ function fromFile(raw: string): unknown {
       continue
     }
 
-    const hsDirMatch = trimmed.match(/\/hs_([^/]+)\/?$/)
-    if (trimmed.startsWith('HiddenServiceDir') && hsDirMatch) {
+    const hsDirMatch = trimmed.match(
+      /^#?\s*HiddenServiceDir\s.*\/hs_([^/]+)\/?$/,
+    )
+    if (hsDirMatch) {
       currentIndex = hsDirMatch[1]
       continue
     }
 
-    const portMatch = trimmed.match(/^HiddenServicePort (\d+)\s+(\S+)/)
+    const portMatch = trimmed.match(
+      /^(#?)\s*HiddenServicePort (\d+)(?:\s+(\S+))?/,
+    )
     if (portMatch && currentPackageId) {
-      const target = portMatch[2]
+      const target = portMatch[1] || !portMatch[3] ? null : portMatch[3]
       if (nextSslInternalPort !== null) {
-        currentPorts[portMatch[1]] = {
+        currentPorts[portMatch[2]] = {
           target,
           ssl: true,
           internalPort: nextSslInternalPort,
@@ -251,10 +282,12 @@ function fromFile(raw: string): unknown {
         // port for legacy entries written before the annotation existed
         // (where it equals the lxcbr0 NAT port, not the upstream internal
         // port, for SSL-wrapped/port-shifted bindings).
-        const colonIdx = target.lastIndexOf(':')
         const internalPort =
-          nextInternalPort ?? parseInt(target.slice(colonIdx + 1), 10)
-        currentPorts[portMatch[1]] = { target, ssl: false, internalPort }
+          nextInternalPort ??
+          (target === null
+            ? NaN
+            : parseInt(target.slice(target.lastIndexOf(':') + 1), 10))
+        currentPorts[portMatch[2]] = { target, ssl: false, internalPort }
         nextInternalPort = null
       }
       continue

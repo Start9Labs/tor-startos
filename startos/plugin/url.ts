@@ -120,7 +120,7 @@ export const exportUrls = sdk.plugin.url.setupExportedUrls(
           for (const [externalPort, portInfo] of Object.entries(
             svc?.ports ?? {},
           )) {
-            if (!portInfo) continue
+            if (!portInfo || portInfo.target === null) continue
             await sdk.plugin.url
               .exportUrl(effects, {
                 hostnameInfo: {

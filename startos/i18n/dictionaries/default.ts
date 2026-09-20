@@ -45,6 +45,15 @@ const dict = {
   'Not reachable from the internet. Enable the Public address on the Tor Relay OR Port interface.': 41,
   'Tor could not reach the relay from the internet. Check that the OR port is forwarded to this server, and that the Public address is enabled on only one connection.': 42,
   'Changing the OR port while the relay is on restarts Tor, so that it tests the new port.': 43,
+  'Delete Onion Addresses': 44,
+  'Delete .onion addresses this server hosts, including any no longer attached to an interface': 45,
+  'Each address you delete is gone for good: its key is destroyed with it.': 46,
+  Addresses: 47,
+  'This server hosts no .onion addresses': 48,
+  'no longer attached to an interface': 49,
+  'address not generated yet': 50,
+  'No addresses selected': 51,
+  'Onion Addresses Deleted': 52,
 } as const
 
 export type I18nKey = keyof typeof dict
