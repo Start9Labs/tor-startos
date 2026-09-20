@@ -16,7 +16,9 @@ import { sdk } from '../sdk'
  * addresses and leave the bridge ones alone. It is ordered ahead of
  * `reloadTorrc` so a repair reaches Tor in the same pass that finds it.
  *
- * Key material is never touched, and a lookup that throws leaves its entry alone
+ * A port with no bridge-reachable address in either mode is parked — a null
+ * target, which the file writes commented out — until the binding returns. Key
+ * material is never touched, and a lookup that throws leaves its entry alone
  * rather than taking the service down with it.
  */
 export const reconcileOnionTargets = sdk.setupOnInit(async (effects) => {
@@ -25,7 +27,8 @@ export const reconcileOnionTargets = sdk.setupOnInit(async (effects) => {
 
   const next = structuredClone(onionServices)
   const retargeted: string[] = []
-  const unservable: string[] = []
+  const parked: string[] = []
+  const resumed: string[] = []
 
   for (const [packageId, hosts] of Object.entries(next)) {
     for (const [hostId, services] of Object.entries(hosts ?? {})) {
@@ -61,29 +64,34 @@ export const reconcileOnionTargets = sdk.setupOnInit(async (effects) => {
             continue
           }
 
-          if (target === null) {
-            unservable.push(where)
-          } else if (target !== portInfo.target || ssl !== portInfo.ssl) {
-            svc.ports[externalPort] = { ...portInfo, target, ssl }
+          if (target === null) ssl = portInfo.ssl
+          if (target === portInfo.target && ssl === portInfo.ssl) continue
+
+          svc.ports[externalPort] = { ...portInfo, target, ssl }
+          const to = `${target}${ssl ? ' ssl' : ''}`
+          if (target === null) parked.push(where)
+          else if (portInfo.target === null) resumed.push(`${where} -> ${to}`)
+          else
             retargeted.push(
-              `${where} ${portInfo.target}${portInfo.ssl ? ' ssl' : ''} -> ${target}${ssl ? ' ssl' : ''}`,
+              `${where} ${portInfo.target}${portInfo.ssl ? ' ssl' : ''} -> ${to}`,
             )
-          }
         }
       }
     }
   }
 
-  if (unservable.length) {
+  if (parked.length) {
     console.warn(
-      `Onion services whose interface no longer serves the mode they were created with, so they cannot be retargeted: ${unservable.join(
-        ', ',
-      )}. Delete them with the Delete Onion Addresses action, or re-add the address from the interface's Tor section to replace them.`,
+      `Parked onion services whose interface has no reachable port; they stop answering until it is back, or until Delete Onion Addresses removes them: ${parked.join(', ')}`,
     )
   }
-
+  if (resumed.length) {
+    console.info(`Resumed onion services: ${resumed.join(', ')}`)
+  }
   if (retargeted.length) {
     console.info(`Retargeted onion services: ${retargeted.join(', ')}`)
+  }
+  if (parked.length || resumed.length || retargeted.length) {
     await torrc.merge(effects, { onionServices: next })
   }
 })

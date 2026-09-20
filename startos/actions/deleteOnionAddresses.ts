@@ -12,20 +12,16 @@ const onionHostname = (packageId: string, hostId: string, index: string) =>
     .catch(() => null)
 
 const inputSpec = InputSpec.of({
-  addresses: Value.dynamicMultiselect(async ({ effects }) => {
+  addresses: Value.dynamicMultiselect(async () => {
     const onionServices =
       (await torrc.read((t) => t.onionServices).once()) ?? {}
     const values: Record<string, string> = {}
     for (const [packageId, hosts] of Object.entries(onionServices)) {
       for (const [hostId, services] of Object.entries(hosts ?? {})) {
-        const host = await sdk.host
-          .get(effects, { hostId, packageId })
-          .once()
-          .catch(() => null)
         for (const [index, svc] of Object.entries(services ?? {})) {
           if (!svc) continue
           const attached = Object.values(svc.ports).some(
-            (p) => p && host?.bindings[p.internalPort],
+            (p) => p && p.target !== null,
           )
           const hostname =
             (await onionHostname(packageId, hostId, index)) ??
