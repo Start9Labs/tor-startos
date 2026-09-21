@@ -1,6 +1,6 @@
-import { torrc } from '../fileModels/torrc'
+import { storeJson } from '../fileModels/store.json'
 import { sdk } from '../sdk'
 
-export const seedFiles = sdk.setupOnInit(async (effects, kind) => {
-  await torrc.merge(effects, {})
+export const seedFiles = sdk.setupOnInit(async (effects) => {
+  await storeJson.merge(effects, {})
 })

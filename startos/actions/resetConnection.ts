@@ -13,7 +13,7 @@ export const resetConnection = sdk.Action.withoutInput(
       'Clear the network data Tor has saved and restart it, so it picks new entry nodes. Use this if Tor is stuck connecting or keeps dropping.',
     ),
     warning: i18n(
-      'Tor will be offline for a few minutes while it reconnects. Your .onion addresses are not affected.',
+      'Tor will be offline for a few minutes. Your .onion addresses are not affected. Each reset slightly raises the chance that someone watching for it can link your .onion addresses to this server, so use it when Tor is stuck, not routinely.',
     ),
     allowedStatuses: 'only-running',
     group: null,
