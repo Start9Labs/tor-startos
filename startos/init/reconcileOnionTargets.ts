@@ -17,11 +17,12 @@ import { sdk } from '../sdk'
  * addresses and leave the bridge ones alone. It is ordered ahead of
  * `reloadTorrc` so a repair reaches Tor in the same pass that finds it.
  *
- * A port whose binding is disabled with no interface left on it, or has no
- * bridge-reachable address in either mode, is parked — a null target, which
- * the file writes commented out — until the binding returns. Key material is
- * never touched, and a lookup that throws leaves its entry alone rather than
- * taking the service down with it.
+ * A port whose binding is disabled and keeps no interface an enabled binding
+ * of the host does not also carry, or has no bridge-reachable address in
+ * either mode, is parked — a null target, which the file writes commented
+ * out — until the binding returns. Key material is never touched, and a
+ * lookup that throws leaves its entry alone rather than taking the service
+ * down with it.
  */
 export const reconcileOnionTargets = sdk.setupOnInit(async (effects) => {
   const onionServices = await torrc.read((t) => t.onionServices).once()
@@ -53,14 +54,14 @@ export const reconcileOnionTargets = sdk.setupOnInit(async (effects) => {
           let ssl = portInfo.ssl
           let target: string | null
           try {
-            // Boot disables every binding but strips no interface: final state.
+            // Boot disables every binding but moves no interface: final state.
             const superseded = await sdk.host
               .get(effects, { packageId, hostId }, (h) => {
                 const binding = h?.bindings[portInfo.internalPort]
-                return (
-                  !!binding &&
-                  !binding.enabled &&
-                  !Object.keys(binding.interfaces).length
+                if (!h || !binding || binding.enabled) return false
+                const live = Object.values(h.bindings).filter((b) => b.enabled)
+                return Object.keys(binding.interfaces).every((id) =>
+                  live.some((b) => id in b.interfaces),
                 )
               })
               .const()
