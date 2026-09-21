@@ -38,6 +38,23 @@ export type TorStatus = {
   dormant: boolean
 }
 
+export type RelayStatus = {
+  /**
+   * Tor's self-test found every ORPort in its current descriptor reachable.
+   * Vacuously true while Tor has no descriptor yet, so read it with `published`.
+   */
+  reachable: boolean
+  /** A directory authority accepted the descriptor Tor last uploaded. */
+  published: boolean
+  /** Tor knows an IPv6 address to publish, so an IPv6 ORPort is in play. */
+  ipv6: boolean
+}
+
+/** The watchdog probes every 30 seconds at its slowest; older than this is no reading. */
+const RELAY_STATUS_MAX_AGE_MS = 90_000
+
+let relay: { at: number; status: RelayStatus } | null = null
+
 /**
  * Everything the health check needs, in one round trip. Returns null when Tor
  * isn't answering its control socket at all.
@@ -47,8 +64,24 @@ export async function probe(): Promise<TorStatus | null> {
     'GETINFO status/bootstrap-phase',
     'GETINFO status/circuit-established',
     'GETINFO dormant',
+    // For relayStatus(). Tor logs a notice for every control connection, so
+    // the relay check reads this reply instead of opening a second one.
+    'GETINFO status/reachability-succeeded/or',
+    'GETINFO status/accepted-server-descriptor',
+    'GETINFO address/v6',
   )
-  if (reply === null) return null
+  if (reply === null) {
+    relay = null
+    return null
+  }
+  relay = {
+    at: Date.now(),
+    status: {
+      reachable: /status\/reachability-succeeded\/or=1/.test(reply),
+      published: /status\/accepted-server-descriptor=1/.test(reply),
+      ipv6: /address\/v6=\S/.test(reply),
+    },
+  }
 
   const phase = reply.match(/BOOTSTRAP PROGRESS=(\d+).*?SUMMARY="([^"]*)"/)
   const dormant = reply.match(/[- ]dormant=(\d+)/)
@@ -74,35 +107,14 @@ export async function resetCircuits(): Promise<boolean> {
   return (await send('DROPGUARDS', 'DROPTIMEOUTS', 'SIGNAL NEWNYM')) !== null
 }
 
-export type RelayStatus = {
-  /**
-   * Tor's self-test found every ORPort in its current descriptor reachable.
-   * Vacuously true while Tor has no descriptor yet, so read it with `published`.
-   */
-  reachable: boolean
-  /** A directory authority accepted the descriptor Tor last uploaded. */
-  published: boolean
-  /** Tor knows an IPv6 address to publish, so an IPv6 ORPort is in play. */
-  ipv6: boolean
-}
-
 /**
  * What Tor's self-test says about the relay's OR port, the test that gates
- * publishing the relay descriptor. Resolves to null when Tor isn't answering
- * its control socket.
+ * publishing the relay descriptor, as of the watchdog's latest `probe()`. Null
+ * when Tor didn't answer that probe, or there hasn't been one lately.
  */
-export async function relayStatus(): Promise<RelayStatus | null> {
-  const reply = await send(
-    'GETINFO status/reachability-succeeded/or',
-    'GETINFO status/accepted-server-descriptor',
-    'GETINFO address/v6',
-  )
-  if (reply === null) return null
-  return {
-    reachable: /status\/reachability-succeeded\/or=1/.test(reply),
-    published: /status\/accepted-server-descriptor=1/.test(reply),
-    ipv6: /address\/v6=\S/.test(reply),
-  }
+export function relayStatus(): RelayStatus | null {
+  if (!relay || Date.now() - relay.at > RELAY_STATUS_MAX_AGE_MS) return null
+  return relay.status
 }
 
 /** Signals Tor to re-read torrc in place, avoiding a full daemon restart. */

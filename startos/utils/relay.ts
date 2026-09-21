@@ -79,7 +79,7 @@ export function relayReachability(effects: Effects) {
       unreachableSince = null
     }
 
-    const status = await relayStatus()
+    const status = relayStatus()
     if (!status) {
       return { result: 'loading', message: i18n('Tor is not ready') }
     }
