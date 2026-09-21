@@ -10,16 +10,18 @@ import { sdk } from '../sdk'
  * OS upgrade reassigning them. Tor then forwards to a port nothing owns and
  * every connection to that .onion is refused at the SOCKS layer.
  *
- * Each target is a `getBridgeAddress` const watch, so this re-runs whenever an
- * address it forwards to changes — never on the exported-URL writes
+ * Each target is a `getBridgeAddress` const watch and each binding's state a
+ * mapped host watch, so this re-runs whenever an address it forwards to or a
+ * binding it depends on changes — never on the exported-URL writes
  * `plugin/url.ts` makes against those same hosts, which touch only plugin
  * addresses and leave the bridge ones alone. It is ordered ahead of
  * `reloadTorrc` so a repair reaches Tor in the same pass that finds it.
  *
- * A port with no bridge-reachable address in either mode is parked — a null
- * target, which the file writes commented out — until the binding returns. Key
- * material is never touched, and a lookup that throws leaves its entry alone
- * rather than taking the service down with it.
+ * A port whose binding is disabled with no interface left on it, or has no
+ * bridge-reachable address in either mode, is parked — a null target, which
+ * the file writes commented out — until the binding returns. Key material is
+ * never touched, and a lookup that throws leaves its entry alone rather than
+ * taking the service down with it.
  */
 export const reconcileOnionTargets = sdk.setupOnInit(async (effects) => {
   const onionServices = await torrc.read((t) => t.onionServices).once()
@@ -51,8 +53,19 @@ export const reconcileOnionTargets = sdk.setupOnInit(async (effects) => {
           let ssl = portInfo.ssl
           let target: string | null
           try {
-            target = await bridge(ssl)
-            if (target === null) {
+            // Boot disables every binding but strips no interface: final state.
+            const superseded = await sdk.host
+              .get(effects, { packageId, hostId }, (h) => {
+                const binding = h?.bindings[portInfo.internalPort]
+                return (
+                  !!binding &&
+                  !binding.enabled &&
+                  !Object.keys(binding.interfaces).length
+                )
+              })
+              .const()
+            target = superseded ? null : await bridge(ssl)
+            if (target === null && !superseded) {
               // The binding stopped serving the mode this entry recorded, so
               // follow the mode it does serve: the address keeps answering on
               // the port it advertises, and the annotation stops lying about it.
@@ -82,7 +95,7 @@ export const reconcileOnionTargets = sdk.setupOnInit(async (effects) => {
 
   if (parked.length) {
     console.warn(
-      `Parked onion services whose interface has no reachable port; they stop answering until it is back, or until Delete Onion Addresses removes them: ${parked.join(', ')}`,
+      `Parked onion services whose port is no longer declared or has no reachable address; they stop answering until it is back, until Delete Onion Addresses removes them, or until adding a Tor address to a current interface moves them: ${parked.join(', ')}`,
     )
   }
   if (resumed.length) {

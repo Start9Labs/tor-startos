@@ -23,11 +23,18 @@ const inputSpec = InputSpec.of({
           const attached = Object.values(svc.ports).some(
             (p) => p && p.target !== null,
           )
+          const internalPorts = Array.from(
+            new Set(
+              Object.values(svc.ports).flatMap((p) =>
+                p ? [p.internalPort] : [],
+              ),
+            ),
+          )
           const hostname =
             (await onionHostname(packageId, hostId, index)) ??
             i18n('address not generated yet')
           values[`${packageId}/${hostId}/${index}`] =
-            `${hostname} — ${packageId}/${hostId}` +
+            `${hostname} — ${packageId}/${hostId}:${internalPorts.join(',')}` +
             (attached ? '' : ` (${i18n('no longer attached to an interface')})`)
         }
       }

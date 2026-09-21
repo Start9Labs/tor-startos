@@ -104,11 +104,13 @@ const inputSpec = InputSpec.of({
         )
         const hasNonSsl = bindingPorts.some((p) => p && !p.ssl)
         const hasSsl = bindingPorts.some((p) => p?.ssl)
+        const parked = Object.values(entry.ports).every(
+          (p) => !p || p.target === null,
+        )
 
-        // Skip an address that doesn't serve this binding at all, or one already
-        // attached to every binding the interface offers (non-SSL, plus SSL when
-        // available).
-        if (!hasNonSsl && !hasSsl) continue
+        // Offer an address serving this binding with a mode to spare, or a parked
+        // one, which moves here.
+        if (!hasNonSsl && !hasSsl && !parked) continue
         if ((!availNonSsl || hasNonSsl) && (!availSsl || hasSsl)) continue
 
         let hostname = key
@@ -273,8 +275,11 @@ export const addOnionService = sdk.Action.withInput(
                 ),
           )
         }
+        const parked = Object.values(existing.ports).every(
+          (p) => !p || p.target === null,
+        )
         services[address.selection] = {
-          ports: { ...existing.ports, ...newPorts },
+          ports: parked ? newPorts : { ...existing.ports, ...newPorts },
         }
       }
     } else {

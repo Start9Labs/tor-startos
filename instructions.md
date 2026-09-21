@@ -22,11 +22,15 @@
 
 Open the specific interface of the other service you want to expose over Tor. On that interface's page you'll find a **Tor** table; from there you can add or remove hidden services for that interface. When adding one you can supply a base64 ed25519 expanded private key for a vanity address, or leave that blank and StartOS will generate a fresh key. The `.onion` lives with the interface you attached it to — it appears and disappears with that interface. You can add an SSL or a non-SSL onion. The SSL toggle starts on for a service that is reachable only over SSL, and off for a web interface, since Tor already secures the connection and a certificate on a web interface's `.onion` only adds a browser warning. An interface that terminates its own TLS (SSL-only) can only take an SSL onion, since it has no plaintext endpoint to forward to.
 
-Your `.onion` addresses look after themselves once they exist. If a service changes the port or the encryption it is served on, Tor re-points the address the next time it starts, so it keeps answering without you doing anything and the address itself never changes. An address whose interface has no reachable port left stops answering until the port is back; it keeps its key, so it returns unchanged.
+Your `.onion` addresses look after themselves once they exist. If a service changes the port or the encryption it is served on, Tor re-points the address the next time it starts, so it keeps answering without you doing anything and the address itself never changes. An address whose interface has no reachable port left, or whose service stopped using the port it was attached to, stops answering until the port is back; it keeps its key, so it returns unchanged.
 
-### Removing a .onion address that no longer shows anywhere
+### A .onion address that no longer shows anywhere
 
-An address stays with the interface it was attached to. If that service changed its interface or port, or was reinstalled differently, the address drops off every interface page and stops answering, but its key stays until you delete it. Open Tor's **Actions** menu and run **Delete Onion Addresses**: it lists every `.onion` address the server hosts, marks the ones no longer attached to an interface, and deletes the ones you pick. Deleting is permanent — the key goes with the address.
+An address stays with the interface it was attached to. If that service changed its interface or port, or was reinstalled differently, the address drops off every interface page and stops answering, but its key stays until you delete it.
+
+To keep the address, open the interface the service uses now and add a Tor address there: the parked address is offered next to **Create new address**, and choosing it moves the address to that interface, where it starts answering again.
+
+To remove it, open Tor's **Actions** menu and run **Delete Onion Addresses**: it lists every `.onion` address the server hosts with the service and port it was attached to, marks the ones no longer attached to an interface, and deletes the ones you pick. Deleting is permanent — the key goes with the address.
 
 ### Tor is stuck connecting
 
