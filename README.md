@@ -134,7 +134,7 @@ Five actions: two hidden ones the plugin drives, and three for you.
 Not user-facing. These are the plugin's table actions — StartOS invokes them when a service is given or loses a Tor address, and they are what write and remove the key material.
 
 - **Deleting is permanent.** The secret key is removed with the entry, so the `.onion` address can never be recovered or reassigned.
-- **A parked address of the same package and host is offered beside creating a new one.** Choosing it replaces its parked ports with the new one, so the address moves to this interface instead of being deleted and recreated.
+- **A parked address of the same package, from any of its hosts, is offered beside creating a new one.** Choosing it moves the address to this interface: its parked ports are replaced with the new one, and an address from another host has its key directory moved under this one.
 
 ### Delete Onion Addresses
 

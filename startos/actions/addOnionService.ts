@@ -1,4 +1,6 @@
-import { hsDir, nextKey, torrc } from '../fileModels/torrc'
+import { mkdir, rename } from 'node:fs/promises'
+import { dirname } from 'node:path'
+import { dropOnionService, hsDir, nextKey, torrc } from '../fileModels/torrc'
 import { i18n } from '../i18n'
 import { sdk } from '../sdk'
 import { bridgeHost, generateOnionFiles } from '../utils'
@@ -70,9 +72,7 @@ const inputSpec = InputSpec.of({
         prefill?.urlPluginMetadata ?? {}
 
       const config = await torrc.read().once()
-      const entries =
-        (packageId && hostId && config?.onionServices?.[packageId]?.[hostId]) ||
-        {}
+      const hosts = (packageId && config?.onionServices?.[packageId]) || {}
 
       // Which onion bindings this interface can serve, mirroring the execution
       // path: a plaintext primary unless the service terminates its own TLS, plus
@@ -96,35 +96,40 @@ const inputSpec = InputSpec.of({
         }
       > = {}
 
-      for (const [key, entry] of Object.entries(entries)) {
-        if (!entry || internalPort == null) continue
+      for (const [host, entries] of Object.entries(hosts)) {
+        for (const [key, entry] of Object.entries(entries ?? {})) {
+          if (!entry || internalPort == null) continue
 
-        const bindingPorts = Object.values(entry.ports).filter(
-          (p) => p?.internalPort === internalPort,
-        )
-        const hasNonSsl = bindingPorts.some((p) => p && !p.ssl)
-        const hasSsl = bindingPorts.some((p) => p?.ssl)
-        const parked = Object.values(entry.ports).every(
-          (p) => !p || p.target === null,
-        )
-
-        // Offer an address serving this binding with a mode to spare, or a parked
-        // one, which moves here.
-        if (!hasNonSsl && !hasSsl && !parked) continue
-        if ((!availNonSsl || hasNonSsl) && (!availSsl || hasSsl)) continue
-
-        let hostname = key
-        try {
-          const content = await sdk.volumes.tor.readFile(
-            `${hsDir(packageId!, hostId!, key)}/hostname`,
+          const bindingPorts =
+            host === hostId
+              ? Object.values(entry.ports).filter(
+                  (p) => p?.internalPort === internalPort,
+                )
+              : []
+          const hasNonSsl = bindingPorts.some((p) => p && !p.ssl)
+          const hasSsl = bindingPorts.some((p) => p?.ssl)
+          const parked = Object.values(entry.ports).every(
+            (p) => !p || p.target === null,
           )
-          hostname = content.toString().trim()
-        } catch {
-          // hostname file doesn't exist yet
-        }
-        variants[key] = {
-          name: hostname,
-          spec: InputSpec.of({}),
+
+          // Offer an address serving this binding with a mode to spare, or a
+          // parked one from any host of the package, which moves here.
+          if (!hasNonSsl && !hasSsl && !parked) continue
+          if ((!availNonSsl || hasNonSsl) && (!availSsl || hasSsl)) continue
+
+          let hostname = key
+          try {
+            const content = await sdk.volumes.tor.readFile(
+              `${hsDir(packageId!, host, key)}/hostname`,
+            )
+            hostname = content.toString().trim()
+          } catch {
+            // hostname file doesn't exist yet
+          }
+          variants[`${host}/${key}`] = {
+            name: hostname,
+            spec: InputSpec.of({}),
+          }
         }
       }
 
@@ -258,9 +263,19 @@ export const addOnionService = sdk.Action.withInput(
     const services = onionServices[packageId][hostId]
 
     if (address.selection !== 'new') {
-      // Reuse existing address by key
-      const existing = services[address.selection]
-      if (existing) {
+      const [fromHost, key] = address.selection.split('/')
+      const existing = onionServices[packageId][fromHost]?.[key]
+      if (existing && fromHost !== hostId) {
+        const moved = nextKey(services)
+        const dest = sdk.volumes.tor.subpath(hsDir(packageId, hostId, moved))
+        await mkdir(dirname(dest), { recursive: true })
+        await rename(
+          sdk.volumes.tor.subpath(hsDir(packageId, fromHost, key)),
+          dest,
+        )
+        dropOnionService(onionServices, packageId, fromHost, key)
+        services[moved] = { ports: newPorts }
+      } else if (existing) {
         const duplicate = Object.values(existing.ports).some(
           (p) => p?.ssl === ssl && p?.internalPort === internalPort,
         )
@@ -278,7 +293,7 @@ export const addOnionService = sdk.Action.withInput(
         const parked = Object.values(existing.ports).every(
           (p) => !p || p.target === null,
         )
-        services[address.selection] = {
+        services[key] = {
           ports: parked ? newPorts : { ...existing.ports, ...newPorts },
         }
       }
