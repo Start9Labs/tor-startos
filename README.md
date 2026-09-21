@@ -9,7 +9,7 @@
 > upstream documentation is accurate and fully applicable — see the
 > Documentation section of `instructions.md` for links.
 
-[Tor](https://gitlab.torproject.org/tpo/core/tor/) is the anonymity network daemon. On StartOS it is infrastructure rather than an app: it gives every other service a SOCKS proxy for outbound traffic and `.onion` addresses for inbound, hands those addresses to StartOS through a plugin, and recovers itself when it wedges on a bad entry node.
+[Tor](https://gitlab.torproject.org/tpo/core/tor/) is the anonymity network daemon. On StartOS it is infrastructure rather than an app: it gives every other service a SOCKS proxy for outbound traffic and `.onion` addresses for inbound, and hands those addresses to StartOS through a plugin.
 
 - **Upstream repo:** <https://gitlab.torproject.org/tpo/core/tor/>
 - **Wrapper repo:** <https://github.com/Start9Labs/tor-startos>
@@ -48,187 +48,166 @@ A minimal Alpine build around the distribution's `tor` package — no upstream i
 | `tor-sub`    | The `tor` daemon — `start-cli package attach tor` lands in it       |
 | `chown-tmp`  | Temporary; re-owns hidden-service directories after a config change |
 
-**The daemon is pointed at a torrc on the volume, not the image's `/etc/tor/torrc`**, because the package generates that file and Tor has to read the generated one.
-
 One oneshot, `chown`, runs first: Tor runs as the `tor` user and refuses a data directory that is not mode 700 and owned by it, while StartOS creates volumes root-owned.
 
-riscv64 is unusual in the fleet and deliberate here: Tor is infrastructure other packages depend on, so it should be available wherever StartOS runs.
+riscv64 is deliberate: Tor is infrastructure other packages depend on, so it should be available wherever StartOS runs.
 
 ## Volume and Data Layout
 
-Two volumes, and only one of them enters the container.
+| Volume    | Mount Point    | Purpose                                                     |
+| --------- | -------------- | ----------------------------------------------------------- |
+| `tor`     | `/var/lib/tor` | `torrc`, the onion keys, Tor's own data, the control socket |
+| `startos` | — (host side)  | `store.json`; a one-time onion import file. Never mounted   |
 
-| Volume    | Mount Point    | Purpose                                                                                                                  |
-| --------- | -------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `tor`     | `/var/lib/tor` | `torrc`, the hidden-service keys, the relay identity, Tor's network caches, the control socket, and the watchdog's state |
-| `startos` | — (host side)  | A one-time onion-address import file; never mounted into a container                                                     |
+Inside the `tor` volume:
 
-**`hidden_services/` is the irreplaceable part.** Each subdirectory holds an ed25519 secret key, and that key _is_ the `.onion` address — lose it and the address is gone for good, with no way to regenerate it.
+| Path                             | What it is                                                                                        |
+| -------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `torrc`                          | Tor's config. The top is the user's; the rest is generated — see [File Models](#file-models)      |
+| `hidden_services/`               | One directory per `.onion` address, `<package>/<host>/hs_<index>/`. **Irreplaceable**             |
+| `data/`                          | Tor's `DataDirectory`: the `state` file that pins its entry nodes, and its caches. **Disposable** |
+| `control.sock`                   | Tor's control socket, which the health check and the reload use                                   |
+| `.wipe-requested`, `.auto-wiped` | The watchdog's flags. Present means set                                                           |
+| `keys/`                          | A relay's identity, on a server that ran one under an earlier release. Unused, and left in place  |
+| `torrc.legacy`                   | The `torrc` an earlier release wrote, set aside by the update to `0.4.9.12:7`. A record only      |
 
-Everything else under `/var/lib/tor` divides into things the package generates (`torrc`), the relay's long-term identity under `keys/`, and Tor's cached view of the network. That last group is what the recovery path deletes.
+**Each `hidden_services/` key _is_ its `.onion` address** — lose it and the address is gone for good. Everything Tor can rebuild lives under `data/`, which is what makes a reset a matter of deleting that one directory.
 
 ## File Models
 
-One model, and it is not a config format any parser handles.
+| File         | Volume    | Format | Modelled                      | Written by                        |
+| ------------ | --------- | ------ | ----------------------------- | --------------------------------- |
+| `store.json` | `startos` | JSON   | Yes — `FileHelper.json`       | The actions, the URL plugin, init |
+| `torrc`      | `tor`     | Text   | No — written, never read back | `init/renderTorrc`                |
 
-| File    | Volume | Format     | Modelled                                             | Written by                    |
-| ------- | ------ | ---------- | ---------------------------------------------------- | ----------------------------- |
-| `torrc` | `tor`  | Tor config | Yes — `FileHelper` with custom serializer and parser | Every init, and three actions |
+**`store.json` is the source of truth.** It holds `automaticRecovery`, and `onions`: a record keyed `<package>/<host>/<index>`, each entry carrying its `ports` (`externalPort`, `internalPort`, `ssl`). It does not hold a forward target, and nothing in it is ever removed automatically.
 
-**`torrc` is generated wholesale from structured data, then parsed back out of the same file.** There is no round-trippable torrc format, so the serializer embeds `# @service`, `# @ssl`, and `# @internalPort` comment annotations, and the parser is a state machine that reconstructs the structure from them. Two consequences worth knowing:
+**`torrc` is rendered from it, one way.** A line beginning `# ===== Everything below this line is generated` splits the file:
 
-- **A hand edit does not survive.** The next write regenerates the file from the parsed structure, and anything the parser does not understand is dropped.
-- **Those comments are load-bearing.** Stripping them loses the package id, host id, and upstream port behind each onion service.
-- **The relay's advertised address and port are derived, not configured.** An init handler re-asserts them from the OR binding on every init and whenever the binding's Public addresses or assigned port change: an `Address` line when exactly one gateway has the Public IPv4 address enabled, an `ORPort <assigned> NoListen` / `ORPort <configured> NoAdvertise` pair when StartOS assigned a different external port, and `IPv4Only` on the ORPort while no public IPv6 address is enabled. **Configure Relay** never sets them, and changing the OR port drops them until the handler derives them again.
+- **Above the marker is the user's.** It is carried over byte for byte on every render, and Tor honors it. A file with no marker is treated as all user section.
+- **Below the marker is generated** and replaced on every render: `SocksPort`, `DataDirectory`, `ControlSocket`, then a `HiddenServiceDir` block per address. To change it, change the store — through a service's interface page or Tor's actions.
+- Tor takes the **last** value of a single-valued option, so the generated `DataDirectory` wins over one written above the marker. List options such as `SocksPort` are additive, so a user can add a listener but not displace the package's.
 
-The file always carries the SOCKS port, the data directory, and the control socket. `SocksPort 0.0.0.0:9050` binds every interface of the _container_, which has only loopback and the LXC bridge, so it is not a LAN exposure. Tor cannot know that and warns on every start, `You specified a public address '0.0.0.0:9050' for SocksPort`; the warning is expected. Beyond that it holds the onion services — keyed by package, host, and an index that is **never reused after a deletion**, because the index is a directory path containing key material — and the relay settings when a relay is enabled. A port whose interface has no bridge-reachable address is written as a commented-out `HiddenServicePort`, and the `HiddenServiceDir` line is commented out too once every port of the entry is, so Tor neither forwards nor publishes the address while the entry and its key stay on record; the annotations above them are what let it come back when the binding returns.
-
-The watchdog's state — whether a wipe is queued, and whether it has already wiped during the current outage — is two flag files beside the torrc, `.wipe-requested` and `.auto-wiped`. Present means set; there is nothing inside them to parse, and creating or removing one is atomic, so the health check and the Reset Tor Connection action can never tear or overwrite each other's write.
+**An onion's forward target is resolved when the file is rendered**, from the live binding, and the render re-runs whenever a target changes. A port with no bridge address is left out, and an address with no port left to forward to is not written at all. Nothing stale is ever kept to point at a port another service might later hold.
 
 ## Dependencies
 
-None, and by design. Tor sits underneath other services rather than beside them — sixteen packages across both registries import its host id and port to reach the SOCKS proxy.
+None, and by design. Tor sits underneath other services rather than beside them. Dependents import `socksHostId` and `socksPort` from `tor-startos/startos/utils` to reach the proxy.
 
 ## Network Access and Interfaces
 
-The SOCKS proxy is a binding with **no exported interface**, and that is deliberate: an unexported binding never reaches the LAN, so it lands only on loopback and the LXC bridge. Dependents get a stable bridge address and nothing to watch.
+The SOCKS proxy is a binding with **no exported interface**: an unexported binding lands only on loopback and the LXC bridge, never the LAN. `SocksPort 0.0.0.0:9050` binds every interface of the _container_, which has only those two, so Tor's start-up warning about a public address is expected.
 
 | Binding      | Host    | Port | Exported?                     |
 | ------------ | ------- | ---- | ----------------------------- |
 | SOCKS5 proxy | `socks` | 9050 | No — bridge and loopback only |
 
-| Interface         | Id   | Type | Port                   | Present when       |
-| ----------------- | ---- | ---- | ---------------------- | ------------------ |
-| Tor Relay OR Port | `or` | p2p  | The configured OR port | A relay is enabled |
-
-**The relay port is the exception to everything else here**: it is exported precisely so it can be reached from the public internet, which is what running a relay means. Its binding is `secure: { ssl: false }` — the OR protocol carries its own TLS, so StartOS treats it like any self-securing p2p port: LAN and `.local` addresses serve as soon as the interface exists, while each gateway's **Public** address is offered but stays off until the user enables it.
-
-Public reachability needs the inbound path and the advertised address to agree. Enabling the Public address on a gateway opens the inbound path there: StartTunnel publishes the port automatically, and on a home connection StartOS asks the router for the forward (a router that refuses needs a manual one). The package keeps the advertised side in step with that — see [File Models](#file-models): with the Public IPv4 address enabled on exactly one gateway, `torrc` pins `Address` to it, and when another service already held the OR port's external slot, the relay advertises the port StartOS actually assigned. With Public enabled on more than one gateway nothing is pinned, and Tor advertises the address the directory authorities see on its **outbound** connections, which then has to be one of those gateways. A persistent `has not managed to confirm reachability for its ORPort(s)` warning, which the Relay Reachability health check surfaces in the UI, means the inbound path is missing or is on a gateway the relay does not advertise; it is not a bootstrap problem, and **Reset Tor Connection** will not fix it. The Public enable is stored against the exact address and port, so changing the OR port or the gateway's public IP turns it off until it is re-enabled.
-
-**The package gives the relay no IPv6 address.** A bare `ORPort` is an IPv6 ORPort as well, and Tor cannot see the server's addresses from inside its container, so it would log `Unable to find IPv6 address for ORPort` once an hour; while no public IPv6 address is enabled on the interface the package writes `IPv4Only` and the notice never appears. With a public IPv6 address enabled the ORPort is left dual-stack and the address is left to Tor's own discovery, so unless Tor finds one the notice returns and the relay publishes over IPv4 alone — it is a notice, not a fault. The package deliberately pins no IPv6 address: Tor omits an IPv6 address it discovered itself when that address fails the self-test, but refuses to publish any descriptor while a _configured_ one fails it, which would take a working IPv4 relay off the network.
+The package exports no interface of its own.
 
 ### The URL plugin
 
-Tor registers itself as StartOS's `url-v0` plugin provider, which is how `.onion` addresses reach the rest of the system. On every init it exports the current set of onion URLs back to the packages they belong to, and in the same pass it prunes entries whose target package no longer exists — deleting the key material with them, since the address can never be reattached to anything. An entry whose host is missing while its package is still installed is kept and not exported: a batch restore writes every package's entry before any of them inits, and a host exists only once its package's own init binds it, which is what triggers the export. An entry the plugin cannot export — its host missing, or its binding gone from a host that still exists — is parked rather than served, and no interface page shows it; **Delete Onion Addresses** is the one place it can still be removed.
+Tor registers as StartOS's `url-v0` plugin provider. On every init, and whenever the store or a watched host changes, it exports each address to the interface it serves.
 
-That pruning only fires on a package StartOS confirms is gone. A lookup that throws leaves the entry and its keys alone, because "I could not resolve this" is not "this no longer exists."
+**A key is never deleted automatically, and neither is a mapping.** What gets cleaned up is what Tor listens on: `torrc` and the exported URLs only ever hold addresses that resolve right now.
 
-**An onion's forward target is re-derived on every start.** The `HiddenServicePort` target stored in `torrc` is the external port the binding held when the entry was written, and a binding's ports move — a package gaining `addSsl`, an OS upgrade reassigning them — after which Tor forwards to a port nothing owns and the address is refused at the SOCKS layer. An init handler resolves each entry's bridge address afresh and rewrites the ones that have drifted, which repairs the address without touching its key. It is a `.const()` watcher, so it also fires the moment a binding moves rather than waiting for the next start. An entry whose interface stopped serving the mode it was created with follows the mode it does serve instead — a plaintext onion on a binding that has become TLS-only is re-pointed at the TLS address and re-annotated — so the address keeps answering on the port it advertises. An entry with no bridge-reachable address at all is parked: its directives are commented out, so the address stops being served and published rather than forwarding to a port some other service may now hold, and it resumes unchanged when the binding is back.
+| What happened                    | What Tor does                                                                                                                        |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| The service's ports moved        | Follows them — the target is resolved at render time                                                                                 |
+| The binding was **disabled**     | Nothing. Disabled is not deleted: its ports stay reserved and nothing forwards to them, so the address is refused, never misdirected |
+| The port or host was **retired** | Stops serving and exporting it. The address becomes unused                                                                           |
+| The package was **uninstalled**  | Stops serving and exporting it. The address becomes unused, and comes back by itself if the package is installed again               |
+| A restore has not reached it yet | Nothing to do — the address is served as soon as its host is bound, in whatever order packages are restored                          |
+| A lookup threw                   | Skips it for this pass                                                                                                               |
+
+**An unused address** is one none of whose ports has anywhere to forward to. It is not written to `torrc` and shows on no interface page. It leaves two ways: Add Onion Service offers it for any interface of the same host, which is how an address survives a service renumbering a port; and Delete Unused Onion Addresses destroys its key.
 
 ## Installation and First-Run Flow
 
-Nothing to configure and nothing to reveal. Install writes a torrc, starts Tor, and the SOCKS proxy is available to other services as soon as the bootstrap completes. There is no task, no account, and no credential.
+Nothing to configure. Install seeds `store.json`, renders a `torrc`, starts Tor, and the SOCKS proxy is available once the bootstrap completes. There is no task, no account, and no credential.
 
-The first start takes longer than later ones — Tor downloads a consensus and builds its first circuits, which is what the bootstrap percentage in the health check is reporting.
+**You do not add onion services by hand.** They arrive through the URL plugin when a service is given a Tor address on its interface page.
 
-**You do not add onion services by hand.** They arrive through the URL plugin when another service asks StartOS for a Tor address, which is why the add and per-address delete actions are hidden.
+**An install carrying onion addresses from StartOS 0.3.5 imports them once.** If `onion-migration.json` is present on the `startos` volume, init derives each address from its key, writes the key material into place, and renames the file. Keys that are not properly clamped are skipped.
 
-**An install carrying onion addresses from an older StartOS imports them once.** If a migration file is present, init derives each address from its key, writes the key material into place, and renames the file so it never runs twice. Keys that are not properly clamped are skipped rather than imported broken.
+**Updating from `0.4.9.12:6` or earlier** runs a migration that reads the onions out of the old `torrc` into `store.json`, sets that file aside as `torrc.legacy`, and moves Tor's state and caches under `data/` so the update does not re-select the server's entry nodes. Relay settings are dropped. The downgrade is prohibited.
 
 ## Actions
 
-Five actions: two hidden ones the plugin drives, and three for you.
-
 ### Add Onion Service / Delete Onion Service (hidden)
 
-Not user-facing. These are the plugin's table actions — StartOS invokes them when a service is given or loses a Tor address, and they are what write and remove the key material.
+The plugin's table actions — StartOS invokes them from an interface page.
 
-- **Deleting is permanent.** The secret key is removed with the entry, so the `.onion` address can never be recovered or reassigned.
+- **Add** attaches an address to the interface's binding: a new one, optionally from a supplied key, or an existing address of the same host that is unused or does not already cover the binding. Attaching to an existing address sheds any mapping of its whose binding is gone.
+- **Delete** detaches: it removes that port's mapping and nothing else. The key stays, and an address left with no port becomes unused.
 
-### Delete Onion Addresses
+### Delete Unused Onion Addresses
 
-Lists every `.onion` address in `torrc` with the package and host it belongs to, marks the ones no longer attached to an interface, and deletes the selected entries with their key material.
+The only thing in this package that destroys a key. It lists every unused address with its package and host, all selected by default, and deletes the selected ones with their keys.
 
-- **When to run it:** an address has to go and no interface page shows it. A service whose interface or port changed leaves its entry parked — unserved, key kept — until that port is back or this action removes it.
-- **What it changes:** removes the entries from `torrc` and deletes their `hidden_services/` directories. Tor reloads when `torrc` changes.
+- **What counts as unused:** no port of the address resolves to a bridge address.
+- **What it changes:** deletes the `hidden_services/` directory and the store entry of each selected address. It checks again at run time: if any selected address has come into use since the form opened, it deletes nothing and fails naming them.
 - **Repeat safety:** deleting is permanent — the key is the address.
 - **Availability: any status.**
 
-### Configure Relay
-
-Turns this node into a Tor relay or bridge, and sets its nickname, contact info, OR port, and bandwidth limits.
-
-- **What it changes:** the `relay` section of `torrc`, and through it the presence of the OR interface.
-- **Cost:** seconds, then a config reload — except that changing the OR port of a relay that is already on **restarts Tor**, interrupting every onion service for the time Tor takes to bootstrap. Tor tests an ORPort only when it starts as a relay or its address changes; reloaded onto a new port it keeps the old port's verdict, and would publish, and the Relay Reachability check would report as reachable, a port nothing has tested.
-- **Repeat safety:** idempotent; the form is pre-filled.
-- **Enabling a relay is not the whole job.** It creates the OR interface; the port reaches the internet only once its **Public** address is enabled — see Interfaces above. A relay whose reachability was never confirmed contributes nothing and publishes no descriptor. The Relay Reachability health check shows whether it has been confirmed.
-- **A relay contributes your bandwidth to the network.** The relay is configured to never act as an exit.
-- **Bandwidth rate and burst are in KB/s, and burst must be at least the rate.** Tor rejects a relay below 75 KB/s or a burst below the rate, so the form enforces both. The `torrc` lines may carry either `KBytes` or `MBytes`; both read back in KB/s.
-- **The relay identity is separate from your onion addresses.** It lives under `keys/` and survives the recovery wipe, so a relay keeps its fingerprint and its accumulated reputation.
-- **The relay shares the Tor process with the onion services.** Tor advises against that combination and logs `Tor is currently configured as a relay and a hidden service` whenever both are configured. A `HiddenServiceDir` is written only for an address whose interface has a reachable port, so a server meant to be a relay or bridge only clears the warning by removing its `.onion` addresses — the StartOS UI's included; a parked address does not count, and **Delete Onion Addresses** removes it for good.
-
 ### Reset Tor Connection
 
-Clears Tor's cached view of the network and restarts it, so it picks new entry nodes.
+Queues a wipe of `data/` and restarts. The deletion happens at the next start, before any daemon exists, because a running Tor holds that state in memory and writes it back on shutdown.
 
-- **When to run it:** Tor is stuck bootstrapping, or keeps dropping circuits. It is the manual form of what the watchdog does automatically.
-- **What it changes:** it queues a wipe; the deletion happens at the next start, before any daemon exists.
-- **Cost:** Tor is offline for a few minutes while it re-bootstraps.
-- **Repeat safety:** safe to re-run.
-- **Your `.onion` addresses are not affected**, nor is the relay identity — the wipe is an allow-list that preserves the torrc, the hidden-service keys, the relay keys, the control socket, and the watchdog state, and deletes everything else.
+- **When to run it:** Tor is stuck bootstrapping, or keeps dropping circuits.
+- **Cost:** Tor is offline for a few minutes, and it selects new entry nodes — see [the trade-off](#the-trade-off-behind-automatic-recovery).
+- **Not affected:** the onion keys, `torrc`, and `store.json`, none of which are under `data/`.
 - **Availability: only while the service is running.**
+
+### Turn Off / Turn On Automatic Recovery
+
+One action whose name, description and confirmation follow the current setting. It flips `automaticRecovery` in `store.json`. Off is **fail closed**: the watchdog never acts, and a stuck Tor stays offline until the user runs Reset Tor Connection.
 
 ## Tasks
 
-None. This package raises no tasks, so the service is never held on a prompt and its ordinary controls are always available.
+None.
 
 ## Health Checks
 
-Two checks. `tor` is also the recovery mechanism; `relay` only reports.
+| Check | Displayed         | Method                                                                  |
+| ----- | ----------------- | ----------------------------------------------------------------------- |
+| `tor` | "Tor SOCKS Proxy" | Tor's own control socket — bootstrap phase, circuit state, and dormancy |
 
-| Check   | Displayed            | Method                                                                  |
-| ------- | -------------------- | ----------------------------------------------------------------------- |
-| `tor`   | "Tor SOCKS Proxy"    | Tor's own control socket — bootstrap phase, circuit state, and dormancy |
-| `relay` | "Relay Reachability" | Tor's own control socket — the result of the OR port self-test          |
-
-The `tor` check reads Tor's real state rather than probing a port, so the message says what Tor is actually doing: a bootstrap percentage with Tor's own summary line while starting, and a distinct message for "bootstrapped but cannot build circuits". **Dormant counts as healthy** — Tor drops circuits when nothing has asked for one in a long time and wakes on the next request.
-
-**It polls once a second while unhealthy instead of the default thirty**, because Tor bootstraps in seconds and a thirty-second poll left the UI showing 0% long after Tor had finished.
+The check reads Tor's real state: a bootstrap percentage with Tor's summary line while starting, and a distinct failure for "bootstrapped but cannot build circuits". **Dormant counts as healthy.** It polls once a second while unhealthy instead of the default thirty.
 
 ### The watchdog
 
-Tor pins an entry node and keeps retrying it — deliberately, to resist guard-discovery attacks — so an entry node that goes bad leaves Tor wedged, and a plain restart does not help because the choice is on disk. The health check escalates instead:
+With Automatic Recovery on, sustained unhealthiness escalates:
 
-1. **Five minutes unhealthy** with no movement in the bootstrap percentage, and it drops the pinned guards and open circuits over the control socket. Any change in the percentage restarts that clock, so a slow start is not mistaken for a wedge.
-2. **Twice more**, ten and then twenty minutes apart.
-3. **Then it wipes** the cached network state and restarts, so Tor re-selects from scratch. The wipe is queued and applied at the next start, because a running Tor holds this state in memory and would write the same entry nodes straight back.
-4. **It wipes at most once per outage.** If Tor is still broken afterwards the cause is not stale state — most likely the server has no working internet — and the check says so and stops rather than restarting in a loop.
+1. **Five minutes** with no movement in the bootstrap percentage: drop the pinned entry nodes and open circuits over the control socket (`DROPGUARDS`, `DROPTIMEOUTS`, `NEWNYM`).
+2. **Once more**, ten minutes later.
+3. **Twenty minutes after that**, queue a wipe of `data/` and restart.
+4. **It wipes at most once per outage.** If Tor is still broken afterwards the cause is not stale state — most likely the server has no working internet — and the check says so and stops.
 
-A healthy reading resets the whole ladder.
+A healthy reading resets the ladder. With Automatic Recovery off, none of this runs.
 
-### Relay reachability
+### The trade-off behind Automatic Recovery
 
-Disabled while relay mode is off. With relay mode on it reads, every 30 seconds, what the `tor` check's latest probe fetched — the two share one control connection, because Tor logs a notice for every connection it accepts — namely `status/reachability-succeeded/or` (Tor's own test of the OR port from outside, the same test that gates publishing the relay descriptor), `status/accepted-server-descriptor`, and `address/v6`.
+Tor pins a small set of entry nodes and keeps them for months. That is deliberate: every fresh selection is another chance of picking an entry node run by an adversary, and the entry node is the one relay that sees this server's IP address. Tor's control specification says of `DROPGUARDS`, "Do not invoke this command lightly; it can increase vulnerability to tracking attacks over time."
 
-- **Success:** Tor has confirmed the OR port is reachable from the internet, and a directory authority has accepted the relay's descriptor. Both are required because Tor's reachability flag reads true until it has built a descriptor at all.
-- **Loading** for the first 20 minutes of unreachable readings, which is as long as Tor itself waits before warning — or 45 minutes when Tor knows an IPv6 address, because Tor keeps reporting the OR port unreachable until one of its 20-minute checks drops an unreachable auto-discovered IPv6 address and publishes over IPv4 alone. The clock starts at the first unreachable reading, so turning relay mode on in a running Tor gets the same allowance as a restart, and it starts over whenever the OR port or the advertised address changes, because Tor then tests from scratch.
-- **Failure, at once,** while no public address is enabled on the OR Port interface: nothing can reach the relay, whatever Tor reports. This is checked against the binding because Tor never revisits a test it has passed until its address changes, so its own verdict stays true after the Public address is turned off.
-- **Failure** after the allowance otherwise: the inbound path is missing, or it is on a gateway the relay does not advertise — see [Network Access and Interfaces](#network-access-and-interfaces). Restarting Tor or running **Reset Tor Connection** does not change it.
-
-The check only reads state; it never restarts the service.
+The watchdog cannot tell a bad entry node from a dead link, so anyone able to interrupt this server's connection for five minutes forces a fresh selection, and can repeat that. For most servers staying reachable matters more, which is why the setting defaults to on. The user-facing text states the trade-off and nothing of this mechanism, on purpose.
 
 ## Backups and Restore
 
-Only the `tor` volume is copied — `sdk.Backups.ofVolumes('tor')`.
+Both volumes are backed up — `sdk.Backups.ofVolumes('tor', 'startos')`. The store maps each key directory to the interface it serves, so the two travel together.
 
-- **Included:** the hidden-service keys, the relay identity, `torrc`, and Tor's caches.
-- **This backup contains the private keys behind every `.onion` address on the server.** Anyone holding it can impersonate those addresses. Treat it accordingly.
-- **Not included:** the `startos` volume, which only ever holds a one-time import file.
-- **Restore:** the addresses come back, because the keys do. Onion entries whose target service is not installed on the restored server are pruned on the first start, and their keys deleted with them. A service restored in the same batch counts as installed from the moment the restore begins, whichever of the two comes up first; one you mean to restore later does not — restore Tor alongside the services that own its addresses, or after them, never before.
+- **This backup contains the private keys behind every `.onion` address on the server.** Anyone holding it can impersonate those addresses.
+- **Restore order does not matter.** Nothing is pruned, so Tor can be restored before, with, or after the services that own its addresses, and each address is served as soon as its host is bound. One whose service never comes back stays unused until Delete Unused Onion Addresses removes it.
+- A backup taken by `0.4.9.12:6` or earlier holds only the `tor` volume; restoring it runs the same migration an update does.
 
 ## Limitations and Differences
 
-1. **`torrc` is generated and hand edits do not survive.** The annotation comments in it are structural, not documentation.
-2. **Onion services are not added by hand.** They come from other services through the URL plugin; the actions that create them are hidden.
-3. **Deleting an onion service is irreversible** — the key is the address.
-4. **Onion entries whose target package is gone are pruned automatically**, key material included. A host missing from a package that is still installed keeps its entry, unexported, until the host is back or **Delete Onion Addresses** removes it.
-5. **An onion whose interface has no bridge-reachable address is parked, not repaired** — there is nothing to point it at, so it stops being served and published until the interface is back, or until **Delete Onion Addresses** removes it.
-6. **The SOCKS proxy is not exported** and is reachable only over loopback and the LXC bridge, never the LAN.
-7. **The relay never acts as an exit.**
-8. **The `tor` health check can restart the service on its own.** That is the watchdog working as intended, not a fault.
-9. **The relay and the onion services run in one Tor process**, which Tor warns about whenever both are configured. A relay-only server is one with no served `.onion` addresses; a parked one does not count, and **Delete Onion Addresses** lists every one, served or not.
-10. **With the Public address enabled on more than one gateway, the relay's address is not pinned.** Tor advertises the address its outbound traffic comes from, and that has to be one of those gateways.
-11. **The package never gives the relay an IPv6 address**, and `torrc` hand edits do not survive. The relay advertises IPv6 only if a public IPv6 address is enabled and Tor discovers it on its own.
+1. **Everything below the marker in `torrc` is generated**, and hand edits there do not survive. Edits above it do.
+2. **Onion services are not added by hand.** They come from other services through the URL plugin.
+3. **Deleting an address is irreversible** — the key is the address.
+4. **A key is only ever deleted by hand.** Uninstalling a service, or retiring its host or port, leaves its addresses unused rather than deleting them, and installing the service again brings them back.
+5. **The SOCKS proxy is not exported** and is reachable only over loopback and the LXC bridge.
+6. **The `tor` health check can restart the service on its own** while Automatic Recovery is on.
+7. **No relay or bridge mode.** It was removed in `0.4.9.12:7`: a relay's IP address is publicly listed, and a server that is both a listed relay and the host of `.onion` addresses can have the two linked by load and timing measurements, whether or not they share a process. A relay's identity under `keys/` is left in place. On StartOS releases with no way to delete a binding, the old `or-multi` binding remains as a disabled record.
 
 ---
 
@@ -246,30 +225,32 @@ subcontainers:
   - chown-tmp # temporary; re-owns hidden-service dirs after a config change
 volumes:
   tor: /var/lib/tor
-  startos: host side (one-time onion-address import)
+  startos: host side, never mounted (store.json; one-time onion import)
 file_models:
-  - /var/lib/tor/torrc # custom serializer/parser; annotation comments are structural
+  - store.json # startos volume; source of truth: onions + automaticRecovery
+generated_files:
+  - /var/lib/tor/torrc # user section above the marker is kept; the rest is rendered from store.json
+disposable:
+  - /var/lib/tor/data # Tor's DataDirectory; Reset Tor Connection deletes it
+irreplaceable:
+  - /var/lib/tor/hidden_services # one key directory per .onion address
 flag_files: # present = set
   - /var/lib/tor/.wipe-requested
   - /var/lib/tor/.auto-wiped
 startos_managed_env_vars: []
 dependencies: []
-interfaces:
-  or: { type: p2p, port: 9001 } # only while a relay is enabled; port is configurable
+interfaces: []
 actions:
   - add-onion-service # hidden; driven by the url-v0 plugin
   - delete-onion-service # hidden; driven by the url-v0 plugin
-  - delete-onion-addresses
-  - configure-relay
+  - delete-unused-addresses # the only action that destroys a key
   - reset-connection # only-running
+  - automatic-recovery # toggles store.json automaticRecovery; off = fail closed
 tasks: []
 health_checks:
   - tor # displayed "Tor SOCKS Proxy"; also the self-recovery watchdog
-  - relay # displayed "Relay Reachability"; disabled unless relay mode is on
 ```
 
 > **For dependent packages:** the SOCKS proxy is an unexported binding on host
 > `socks`, port 9050. Import `socksHostId` and `socksPort` from
-> `tor-startos/startos/utils` rather than hardcoding either — sixteen packaging
-> repos already do, and nothing in this repo references them, so a rename here
-> breaks all of them silently.
+> `tor-startos/startos/utils` rather than hardcoding either.
