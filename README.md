@@ -108,18 +108,18 @@ The package exports no interface of its own.
 
 Tor registers as StartOS's `url-v0` plugin provider. On every init, and whenever the store or a watched host changes, it exports each address to the interface it serves.
 
-**A key is never deleted automatically, and neither is a mapping.** What gets cleaned up is what Tor listens on: `torrc` and the exported URLs only ever hold addresses that resolve right now.
+**A key is never deleted automatically, and neither is a mapping.** What gets cleaned up is what Tor listens on: `torrc` and the exported URLs only ever hold ports whose binding is enabled and resolves right now.
 
-| What happened                    | What Tor does                                                                                                                        |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| The service's ports moved        | Follows them — the target is resolved at render time                                                                                 |
-| The binding was **disabled**     | Nothing. Disabled is not deleted: its ports stay reserved and nothing forwards to them, so the address is refused, never misdirected |
-| The port or host was **retired** | Stops serving and exporting it. The address becomes unused                                                                           |
-| The package was **uninstalled**  | Stops serving and exporting it. The address becomes unused, and comes back by itself if the package is installed again               |
-| A restore has not reached it yet | Nothing to do — the address is served as soon as its host is bound, in whatever order packages are restored                          |
-| A lookup threw                   | Skips it for this pass                                                                                                               |
+| What happened                    | What Tor does                                                                                                                                                                                                    |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The service's ports moved        | Follows them — the target is resolved at render time                                                                                                                                                             |
+| The binding was **disabled**     | Stops serving and exporting it. The address is not unused: the port stays reserved to the service, so the address returns when the binding is enabled again, and Delete Unused Onion Addresses does not offer it |
+| The port or host was **retired** | Stops serving and exporting it. The address becomes unused                                                                                                                                                       |
+| The package was **uninstalled**  | Stops serving and exporting it. The address becomes unused, and comes back by itself if the package is installed again                                                                                           |
+| A restore has not reached it yet | Nothing to do — the address is served as soon as its host is bound, in whatever order packages are restored                                                                                                      |
+| A lookup threw                   | Skips it for this pass                                                                                                                                                                                           |
 
-**An unused address** is one none of whose ports has anywhere to forward to. It is not written to `torrc` and shows on no interface page. It leaves two ways: Add Onion Service offers it for any interface of the same host, which is how an address survives a service renumbering a port; and Delete Unused Onion Addresses destroys its key.
+**An unused address** is one none of whose ports belongs to a binding its service still holds: no port is on a disabled binding, and none resolves to a bridge address. It is not written to `torrc` and shows on no interface page. It leaves two ways: Add Onion Service offers it for any interface of the same host, which is how an address survives a service renumbering a port; and Delete Unused Onion Addresses destroys its key.
 
 ## Installation and First-Run Flow
 
@@ -144,7 +144,7 @@ The plugin's table actions — StartOS invokes them from an interface page.
 
 The only thing in this package that destroys a key. It lists every unused address with its package and host, all selected by default, and deletes the selected ones with their keys.
 
-- **What counts as unused:** no port of the address resolves to a bridge address.
+- **What counts as unused:** no port of the address is on a disabled binding or resolves to a bridge address. A disabled binding is not served, but its address is kept for when the service enables it again.
 - **What it changes:** deletes the `hidden_services/` directory and the store entry of each selected address. It checks again at run time: if any selected address has come into use since the form opened, it deletes nothing and fails naming them.
 - **Repeat safety:** deleting is permanent — the key is the address.
 - **Availability: any status.**
