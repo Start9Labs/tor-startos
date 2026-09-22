@@ -15,9 +15,10 @@ export const registerUrlPlugin = sdk.setupOnInit(async (effects) =>
 
 /**
  * Exports every onion to the interface it serves. An address whose host or
- * binding is absent is skipped, not removed: nothing here deletes a mapping or
- * a key, so a service that is restored, reinstalled or re-bound later gets its
- * address back, and a key goes only when the user deletes it.
+ * binding is absent or disabled is skipped, not removed: nothing here deletes a
+ * mapping or a key, so a service that is restored, reinstalled, re-bound or
+ * re-enabled later gets its address back, and a key goes only when the user
+ * deletes it.
  */
 export const exportUrls = sdk.plugin.url.setupExportedUrls(
   async ({ effects }) => {
@@ -30,7 +31,11 @@ export const exportUrls = sdk.plugin.url.setupExportedUrls(
       // this same host, and a watch on the whole host would re-fire on it.
       const bound = await sdk.host
         .get(effects, { hostId, packageId }, (host) =>
-          host ? Object.keys(host.bindings).map(Number) : null,
+          host
+            ? Object.entries(host.bindings)
+                .filter(([, b]) => b.enabled)
+                .map(([port]) => Number(port))
+            : null,
         )
         .const()
         .catch((e) => {
