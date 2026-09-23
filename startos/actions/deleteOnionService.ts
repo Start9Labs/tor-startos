@@ -6,7 +6,7 @@ import {
 } from '../fileModels/store.json'
 import { i18n } from '../i18n'
 import { sdk } from '../sdk'
-import { onionHostname } from '../utils/onions'
+import { onionHostname, requireOwner } from '../utils/onions'
 
 const { InputSpec, Value } = sdk
 
@@ -38,6 +38,7 @@ export const deleteOnionService = sdk.Action.withInput(
     allowedStatuses: 'any',
     group: null,
     visibility: 'hidden',
+    access: 'public',
   }),
 
   // input spec
@@ -47,8 +48,9 @@ export const deleteOnionService = sdk.Action.withInput(
   async () => null,
 
   // execution
-  async ({ effects, input }) => {
+  async ({ effects, input, caller }) => {
     const { packageId, hostId, hostname, port, ssl } = input.urlPluginMetadata
+    requireOwner(caller, packageId)
 
     const onions = present(await storeJson.read((s) => s.onions).once())
 

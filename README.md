@@ -139,6 +139,7 @@ The plugin's table actions — StartOS invokes them from an interface page.
 
 - **Add** attaches an address to the interface's binding: a new one, optionally from a supplied key, or an existing address of the same host that is unused or does not already cover the binding. Attaching to an existing address sheds any mapping of its whose binding is gone.
 - **Delete** detaches: it removes that port's mapping and nothing else. The key stays, and an address left with no port becomes unused.
+- **Services call them too.** Both are `access: 'public'`, so any installed service can run them through `effects.action.run` to manage its own addresses — for instance, to move an address back onto a port it renumbered. Each checks the action's `caller` against `urlPluginMetadata.packageId` and refuses a service acting on another's host; the user, whose `caller` is `null`, may act on any. Add runs the check in its input form too, so a service cannot list another's unused addresses either. The input is the one the interface page sends: `urlPluginMetadata` names the package, host, interface and internal port, and `address.selection` is `new` or one of the address ids the form offers.
 
 ### Delete Unused Onion Addresses
 
@@ -241,8 +242,8 @@ startos_managed_env_vars: []
 dependencies: []
 interfaces: []
 actions:
-  - add-onion-service # hidden; driven by the url-v0 plugin
-  - delete-onion-service # hidden; driven by the url-v0 plugin
+  - add-onion-service # hidden; url-v0 plugin; public, a service may call it for its own hosts
+  - delete-onion-service # hidden; url-v0 plugin; public, a service may call it for its own hosts
   - delete-unused-addresses # the only action that destroys a key
   - reset-connection # only-running
   - automatic-recovery # toggles store.json automaticRecovery; off = fail closed

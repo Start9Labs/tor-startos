@@ -10,7 +10,7 @@ import {
 import { i18n } from '../i18n'
 import { sdk } from '../sdk'
 import { generateOnionFiles } from '../utils'
-import { isServed, onionHostname } from '../utils/onions'
+import { isServed, onionHostname, requireOwner } from '../utils/onions'
 
 const { InputSpec, Value, Variants } = sdk
 
@@ -157,14 +157,16 @@ export const addOnionService = sdk.Action.withInput(
     allowedStatuses: 'any',
     group: null,
     visibility: 'hidden',
+    access: 'public',
   }),
 
   // input spec
-  async ({ effects, prefill }) => {
+  async ({ effects, prefill, caller }) => {
     const p = prefill as typeof inputSpec._PARTIAL
     let noSsl = false
 
     const meta = p?.urlPluginMetadata
+    requireOwner(caller, meta?.packageId)
     if (meta?.packageId && meta.hostId && meta.internalPort != null) {
       const internalPort = meta.internalPort
       noSsl = await sdk.host
@@ -188,8 +190,9 @@ export const addOnionService = sdk.Action.withInput(
   async () => null,
 
   // execution
-  async ({ effects, input }) => {
+  async ({ effects, input, caller }) => {
     const { packageId, hostId, internalPort } = input.urlPluginMetadata
+    requireOwner(caller, packageId)
     const address = input.address as {
       selection: string
       value: { privateKey?: string | null }

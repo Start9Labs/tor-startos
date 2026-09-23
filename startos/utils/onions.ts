@@ -2,6 +2,18 @@ import { T } from '@start9labs/start-sdk'
 import { hsDir, Onion, parseOnionId } from '../fileModels/store.json'
 import { sdk } from '../sdk'
 
+/**
+ * Throws unless the user, or the service that owns the address, is asking.
+ * A caller is the id of the service that ran the action; `null` is the user.
+ */
+export function requireOwner(caller: string | null, packageId?: string) {
+  if (caller !== null && caller !== packageId) {
+    throw new Error(
+      `${caller} can only manage its own onion addresses, not those of ${packageId ?? 'another service'}`,
+    )
+  }
+}
+
 /** The address's .onion hostname, or null before its key is written. */
 export const onionHostname = (id: string) =>
   sdk.volumes.tor
