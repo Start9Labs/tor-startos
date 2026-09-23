@@ -1,5 +1,5 @@
+import { torrcFile } from '../fileModels/torrc'
 import { reloadConfig } from '../utils/control'
-import { torrc } from '../fileModels/torrc'
 import { sdk } from '../sdk'
 
 /**
@@ -7,7 +7,7 @@ import { sdk } from '../sdk'
  * changes, avoiding a full daemon restart.
  */
 export const reloadTorrc = sdk.setupOnInit(async (effects) => {
-  await torrc.read().const(effects)
+  await torrcFile.read().const(effects)
 
   // Fix ownership on hidden service dirs — files are written as root by
   // actions, but Tor requires them owned by the tor user with mode 700
@@ -26,7 +26,7 @@ export const reloadTorrc = sdk.setupOnInit(async (effects) => {
         [
           'sh',
           '-c',
-          'chmod -R 700 /var/lib/tor/hidden_services && chown -R tor:tor /var/lib/tor/hidden_services',
+          'mkdir -p /var/lib/tor/hidden_services && chmod -R 700 /var/lib/tor/hidden_services && chown -R tor:tor /var/lib/tor/hidden_services',
         ],
         { user: 'root' },
       )

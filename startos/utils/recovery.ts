@@ -1,6 +1,7 @@
-import { access, readdir, rm, writeFile } from 'node:fs/promises'
+import { access, rm, writeFile } from 'node:fs/promises'
 import { T } from '@start9labs/start-sdk'
 import type { HealthCheckResult } from '@start9labs/start-sdk/lib/health/checkFns'
+import { storeJson } from '../fileModels/store.json'
 import { probe, resetCircuits } from './control'
 import { i18n } from '../i18n'
 import { sdk } from '../sdk'
@@ -25,26 +26,6 @@ export const wipeRequested = flag('.wipe-requested')
 /** The watchdog already wiped during this outage; it does not wipe twice. */
 export const autoWiped = flag('.auto-wiped')
 
-/**
- * What survives a wipe: the config we generate, the onion service keys that
- * *are* the user's .onion addresses, the relay's long-term identity (wiping it
- * would change the relay's fingerprint), the live control socket, and the
- * watchdog's own state. Everything else under the data directory is Tor's
- * cached view of the network, which it rebuilds on the next start.
- *
- * An allow-list on purpose — a wipe that misses a cache file leaves the bad
- * entry node in place, which is the whole failure being recovered from. Anything
- * new the package persists on this volume must be added here.
- */
-const PRESERVE = [
-  'torrc',
-  'hidden_services',
-  'keys',
-  'control.sock',
-  wipeRequested.name,
-  autoWiped.name,
-]
-
 /** Tor must be unhealthy this long before the watchdog does anything at all. */
 const STALL_MS = 5 * 60_000
 
@@ -55,22 +36,19 @@ const STALL_MS = 5 * 60_000
 const RETRY_MS = [10, 20].map((m) => m * 60_000)
 
 /**
- * Deletes Tor's cached view of the network: the `state` file that pins its entry
- * nodes, the consensus and descriptor caches, and the lock.
- *
+ * Tor's DataDirectory, which holds nothing but its cached view of the network:
+ * the `state` file that pins its entry nodes, and the consensus and descriptor
+ * caches. The torrc, the onion keys and the flags live beside it, not in it.
+ */
+const DATA_DIR = 'data'
+
+/**
  * Must run with no tor process attached to the volume. A running Tor holds this
  * state in memory and flushes it on shutdown, so deleting the files underneath
  * it writes the same entry nodes straight back.
  */
-async function wipeNetworkState(): Promise<string[]> {
-  const removed = (await readdir(sdk.volumes.tor.path)).filter(
-    (entry) => !PRESERVE.includes(entry),
-  )
-  for (const entry of removed) {
-    await rm(sdk.volumes.tor.subpath(entry), { recursive: true, force: true })
-  }
-  return removed
-}
+const wipeNetworkState = () =>
+  rm(sdk.volumes.tor.subpath(DATA_DIR), { recursive: true, force: true })
 
 /**
  * Performs a wipe left pending by the watchdog or the Reset Tor Connection
@@ -83,10 +61,8 @@ async function wipeNetworkState(): Promise<string[]> {
  */
 export async function applyPendingWipe(): Promise<boolean> {
   if (await wipeRequested.isSet()) {
-    const removed = await wipeNetworkState()
-    console.info(
-      `Wiped Tor network state: ${removed.join(', ') || '(nothing to remove)'}`,
-    )
+    await wipeNetworkState()
+    console.info('Wiped Tor network state')
     await wipeRequested.clear()
   }
   return autoWiped.isSet()
@@ -154,7 +130,11 @@ export function watchdog(effects: T.Effects, wiped: boolean) {
     }
     lastProgress = progress
 
-    if (now >= nextAttemptAt) {
+    // Off is fail closed: nothing about Tor's connection changes by itself.
+    const automatic =
+      (await storeJson.read((s) => s.automaticRecovery).once()) ?? true
+
+    if (automatic && now >= nextAttemptAt) {
       // Dropping entry nodes only means anything while Tor is answering. When
       // it isn't, skip straight to the wipe: a control socket unreachable this
       // long usually means Tor can't get through its own start-up state.
@@ -201,7 +181,11 @@ export function watchdog(effects: T.Effects, wiped: boolean) {
     if (bootstrap.progress >= 100)
       return {
         result: 'failure',
-        message: i18n('Tor is bootstrapped but cannot build circuits'),
+        message: automatic
+          ? i18n('Tor is bootstrapped but cannot build circuits')
+          : i18n(
+              'Tor cannot build circuits. Automatic Recovery is off, so run Reset Tor Connection if this does not clear.',
+            ),
       }
     return {
       result: 'loading',
