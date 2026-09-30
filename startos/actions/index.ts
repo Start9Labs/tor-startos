@@ -1,13 +1,13 @@
 import { sdk } from '../sdk'
 import { addOnionService } from './addOnionService'
 import { deleteOnionService } from './deleteOnionService'
-import { deleteOnionAddresses } from './deleteOnionAddresses'
-import { configureRelay } from './configureRelay'
+import { deleteUnusedAddresses } from './deleteUnusedAddresses'
 import { resetConnection } from './resetConnection'
+import { automaticRecovery } from './automaticRecovery'
 
 export const actions = sdk.Actions.of()
   .addAction(addOnionService)
   .addAction(deleteOnionService)
-  .addAction(deleteOnionAddresses)
-  .addAction(configureRelay)
+  .addAction(deleteUnusedAddresses)
   .addAction(resetConnection)
+  .addAction(automaticRecovery)

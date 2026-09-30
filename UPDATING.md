@@ -1,6 +1,6 @@
 # Updating the upstream version
 
-Tor is not pinned in this repo — it is installed via `apk add tor` from the Alpine base image, so the shipped Tor version is whatever the `Dockerfile`'s Alpine tag currently carries. Bumping Tor therefore means either (a) Alpine has published a new `tor` package within the current Alpine release and a rebuild will pick it up, or (b) we need to move to a newer Alpine base image to reach a newer Tor.
+The upstream version is `torVersion` in `startos/manifest/index.ts`. It supplies the Docker build's `TOR_VERSION` argument and the upstream component of `startos/versions/current.ts`. The Dockerfile installs that exact Alpine package version, including the `-r0` packaging revision.
 
 ## Determining the upstream version
 
@@ -13,30 +13,22 @@ curl -fsSL 'https://gitlab.torproject.org/api/v4/projects/tpo%2Fcore%2Ftor/repos
   | jq -r '.[].name' | grep -E '^tor-[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -n1
 ```
 
-Note the **four** version components — Tor versions are `0.4.9.11`, not `0.4.9`. A three-component regex matches nothing and the command silently prints an empty line. The filter also drops the `-alpha` / `-rc` / `-alpha-dev` tags, which are interleaved with the stable ones in the tag list; only a bare four-component tag is a stable release.
+Tor versions have four components. The filter selects stable tags and excludes prereleases.
 
-No version is pinned in this repo — there is no Tor tag, ARG, or `TOR_VERSION` variable to read. Use this only to know what the newest stable Tor is so you can compare against what Alpine ships (next section).
+### Tor as packaged by Alpine
 
-### Tor as packaged by Alpine (what actually ships)
-
-Tor is pulled in by `RUN apk add --no-cache tor` against the Alpine tag in the `Dockerfile`. **`tor` lives in Alpine's `community` repository, not `main`.** To see which Tor version that resolves to for the currently pinned Alpine release, read the authoritative package index (`APKINDEX`) for that release:
+Tor lives in Alpine's `community` repository. Check the package index for each supported architecture:
 
 ```
 ALPINE_TAG=$(grep -oP '(?<=^FROM alpine:)[0-9.]+' Dockerfile)
-curl -fsSL "https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_TAG}/community/x86_64/APKINDEX.tar.gz" \
-  | tar -xzO APKINDEX | grep -A1 '^P:tor$'
+for ARCH in x86_64 aarch64 riscv64; do
+  echo "$ARCH"
+  curl -fsSL "https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_TAG}/community/${ARCH}/APKINDEX.tar.gz" \
+    | tar -xzO APKINDEX | grep -A1 '^P:tor$'
+done
 ```
 
-That prints `P:tor` / `V:<version>-r<rev>` — the exact version a fresh build will install. Equivalently, ask `apk` itself inside the base image:
-
-```
-docker run --rm alpine:${ALPINE_TAG} sh -c 'apk update -q && apk search -e tor'
-```
-
-The pin lives implicitly in the Alpine base tag, not in a Tor-specific variable.
-
-> [!NOTE]
-> The human-readable package browser lives at `https://pkgs.alpinelinux.org/package/v${ALPINE_TAG}/community/x86_64/tor` — note **`community`** in the path; the `main` path 404s, which is what made the old scrape in this doc fail. Don't scrape it either way: its HTML has since changed, so version-extracting `grep`s against it now come back empty rather than erroring. Use the `APKINDEX` or `apk` queries above.
+The `V:` line gives the exact version and Alpine packaging revision. The desired upstream release must be available for all three architectures before bumping. If its revision differs from `-r0`, update the Dockerfile's exact package selector too.
 
 ### Alpine base image
 
@@ -47,22 +39,11 @@ curl -fsSL 'https://hub.docker.com/v2/repositories/library/alpine/tags?page_size
   | jq -r '.results[].name'
 ```
 
-Pin lives in `Dockerfile` (`FROM alpine:<tag>`).
+The base-image pin lives in `Dockerfile` (`FROM alpine:<tag>`). Move it when the desired Tor release requires a newer Alpine release.
 
 ## Applying the bump
 
-There are two distinct bumps; do whichever applies.
-
-### Alpine has a newer Tor within the current Alpine release
-
-Nothing in this repo needs to change to pick up the new Tor — `apk add tor` will resolve to the new version on the next image build. Update `startos/versions/current.ts` (`version` + `releaseNotes`) and rebuild.
-
-### Need a newer Alpine to reach a newer Tor
-
-Edit `Dockerfile`:
-
-```
-FROM alpine:<new-tag>
-```
-
-Then update `startos/versions/current.ts` (`version` + `releaseNotes`) and rebuild.
+1. Verify Alpine publishes the desired Tor package for every supported architecture.
+2. Update `torVersion` in `startos/manifest/index.ts`, the downstream revision and release notes in `startos/versions/current.ts`, and the Alpine packaging revision in the Dockerfile if needed.
+3. Build the packages. The explicit package selector and build argument make a version change invalidate the cached Tor-install layer.
+4. Verify the binary with `start-cli package attach tor -n tor-sub -- tor --version`, as well as the package manifest version.

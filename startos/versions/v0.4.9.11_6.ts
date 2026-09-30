@@ -1,7 +1,7 @@
 import { mkdir, rename, rmdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { VersionInfo, IMPOSSIBLE } from '@start9labs/start-sdk'
-import { hsDir, nextKey, torrc } from '../fileModels/torrc'
+import { hsDir, nextKey, torrc } from './legacy/torrc'
 import { sdk } from '../sdk'
 
 const LEGACY_ID = 'STARTOS'
