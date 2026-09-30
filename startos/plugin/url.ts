@@ -8,6 +8,7 @@ import {
   storeJson,
 } from '../fileModels/store.json'
 import { sdk } from '../sdk'
+import { watchOnionTarget } from '../utils/onions'
 
 export const registerUrlPlugin = sdk.setupOnInit(async (effects) =>
   sdk.plugin.url.register(effects, { tableAction: addOnionService }),
@@ -27,33 +28,20 @@ export const exportUrls = sdk.plugin.url.setupExportedUrls(
     for (const [id, onion] of Object.entries(onions)) {
       const { packageId, hostId } = parseOnionId(id)
 
-      // Map to the bound ports before `.const()`: exporting a URL writes to
-      // this same host, and a watch on the whole host would re-fire on it.
-      const bound = await sdk.host
-        .get(effects, { hostId, packageId }, (host) =>
-          host
-            ? Object.entries(host.bindings)
-                .filter(([, b]) => b.enabled)
-                .map(([port]) => Number(port))
-            : null,
-        )
-        .const()
-        .catch((e) => {
-          console.warn(`Not exporting ${id}: ${String(e)}`)
-          return null
-        })
-      if (bound === null) continue
-
       const hostname = await FileHelper.string({
         base: sdk.volumes.tor,
-        subpath: `${hsDir(id)}/hostname`,
+        subpath: `${hsDir(id, onion)}/hostname`,
       })
         .read()
         .const(effects)
       if (!hostname) continue
 
       for (const port of onion.ports) {
-        if (!bound.includes(port.internalPort)) continue
+        const target = await watchOnionTarget(effects, id, port).catch((e) => {
+          console.warn(`Not exporting ${id}: ${String(e)}`)
+          return null
+        })
+        if (target === null) continue
         await sdk.plugin.url
           .exportUrl(effects, {
             hostnameInfo: {

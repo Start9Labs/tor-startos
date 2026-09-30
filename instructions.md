@@ -15,6 +15,10 @@
 - **Uninstalling Tor permanently deletes all onion service keys and `.onion` addresses.** Any service reachable through one of those addresses will lose it. Make a backup first if you want to keep your addresses.
 - **A `.onion` address outlives the service it belongs to.** Uninstalling a service leaves its addresses unused rather than deleting them, and installing it again brings them back. To get rid of one for good, use **Delete Unused Onion Addresses**.
 
+## Getting set up
+
+Install Tor, then **start the service**. Wait for the SOCKS Proxy health check to report that Tor is running.
+
 ## Using Tor
 
 ### Adding a .onion address to another service
@@ -23,13 +27,13 @@ Open the specific interface of the other service you want to expose over Tor. On
 
 Your `.onion` addresses look after themselves once they exist. If a service's ports move, the address follows them without you doing anything, and the address itself never changes.
 
-If an update to a service removes the port an address was attached to, the address is kept. Open the interface you want it on, add a `.onion` address, and pick the existing address from the list instead of creating a new one.
+If an update to a service removes the port an address was attached to, the address is kept. Open the interface you want it on, add a `.onion` address, and pick the existing address from the list instead of creating a new one. An entirely unused address can move to another host of the same service; an address still in use stays on its existing host. This is an explicit choice, not an automatic host migration.
 
 ### Removing a .onion address
 
 Removing an address from an interface's **Tor** table detaches it; its key is kept, so you can attach the same address again later.
 
-To delete addresses for good, open Tor's **Actions** menu and run **Delete Unused Onion Addresses**. It lists every `.onion` address that no interface is using — ones you detached, and ones whose service was uninstalled or no longer has the port — with all of them selected. Untick any you want to keep. Deleting is permanent — the key goes with the address.
+To delete addresses for good, open Tor's **Actions** menu and run **Delete Unused Onion Addresses**. It lists every `.onion` address that no interface is using — ones you detached, and ones whose service was uninstalled or no longer has the port — with all of them selected. Untick any you want to keep. Deleting is permanent — the key goes with the address. If StartOS cannot check whether an address is in use, the action fails without deleting any keys; retry once that check is available.
 
 ### Restoring from a backup
 
@@ -62,4 +66,4 @@ Tor's configuration file, `torrc`, has two parts. The top part is yours: options
 
 ### Relays and bridges
 
-This service no longer runs a Tor relay or bridge. A relay's IP address is public, and a server that both runs a relay and hosts `.onion` addresses can have the two linked. Relay support is planned to return as a separate service.
+Run a Tor relay or bridge separately from the server hosting your `.onion` addresses. A relay's IP address is public, and a server that both runs a relay and hosts `.onion` addresses can have the two linked. If you previously assigned custom domains to Tor's relay host, reattach them to a current service interface after updating; the update retires that host.

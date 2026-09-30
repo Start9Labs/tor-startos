@@ -57,7 +57,7 @@ export const deleteOnionService = sdk.Action.withInput(
     for (const [id, onion] of Object.entries(onions)) {
       const owner = parseOnionId(id)
       if (owner.packageId !== packageId || owner.hostId !== hostId) continue
-      if ((await onionHostname(id)) !== hostname) continue
+      if ((await onionHostname(id, onion)) !== hostname) continue
 
       // Detach only. The key stays until the user deletes it.
       onions[id] = {

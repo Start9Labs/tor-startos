@@ -25,7 +25,7 @@ async function unusedAddresses(effects: T.Effects) {
 
 const inputSpec = InputSpec.of({
   addresses: Value.dynamicMultiselect(async ({ effects }) => {
-    const { unused } = await unusedAddresses(effects)
+    const { onions, unused } = await unusedAddresses(effects)
 
     if (!unused.length)
       return {
@@ -39,7 +39,8 @@ const inputSpec = InputSpec.of({
     for (const id of unused) {
       const { packageId, hostId } = parseOnionId(id)
       const hostname =
-        (await onionHostname(id)) ?? i18n('address not generated yet')
+        (await onionHostname(id, onions[id])) ??
+        i18n('address not generated yet')
       values[id] = `${hostname} — ${packageId}/${hostId}`
     }
     return {
@@ -84,7 +85,7 @@ export const deleteUnusedAddresses = sdk.Action.withInput(
     const inUse = input.addresses.filter((id) => !unused.includes(id))
     if (inUse.length) {
       const names = await Promise.all(
-        inUse.map(async (id) => (await onionHostname(id)) ?? id),
+        inUse.map(async (id) => (await onionHostname(id, onions[id])) ?? id),
       )
       throw new Error(
         `${i18n('Nothing was deleted, because these addresses are now in use:')} ${names.join(', ')}`,
@@ -93,8 +94,8 @@ export const deleteUnusedAddresses = sdk.Action.withInput(
 
     const deleted: string[] = []
     for (const id of input.addresses) {
-      deleted.push((await onionHostname(id)) ?? id)
-      await rm(sdk.volumes.tor.subpath(hsDir(id)), {
+      deleted.push((await onionHostname(id, onions[id])) ?? id)
+      await rm(sdk.volumes.tor.subpath(hsDir(id, onions[id])), {
         recursive: true,
         force: true,
       })

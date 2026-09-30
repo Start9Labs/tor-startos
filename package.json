@@ -3,7 +3,8 @@
   "scripts": {
     "build": "rm -rf ./javascript && ncc build startos/index.ts -o ./javascript",
     "prettier": "prettier --write startos",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit && npm run test",
+    "test": "node --test test/*.test.cjs"
   },
   "dependencies": {
     "@noble/curves": "*",

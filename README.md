@@ -35,7 +35,7 @@
 
 ## Image and Container Runtime
 
-A minimal Alpine build around the distribution's `tor` package — no upstream image exists to use.
+A minimal Alpine build around the distribution's `tor` package — no upstream image exists to use. The manifest's `torVersion` supplies an exact APK version to the Docker build and the package version's upstream component.
 
 | Property      | Value                                   |
 | ------------- | --------------------------------------- |
@@ -69,7 +69,7 @@ Inside the `tor` volume:
 | `control.sock`                   | Tor's control socket, which the health check and the reload use                                   |
 | `.wipe-requested`, `.auto-wiped` | The watchdog's flags. Present means set                                                           |
 | `keys/`                          | A relay's identity, on a server that ran one under an earlier release. Unused, and left in place  |
-| `torrc.legacy`                   | The `torrc` an earlier release wrote, set aside by the update to `0.4.9.12:7`. A record only      |
+| `torrc.legacy`                   | The `torrc` an earlier release wrote, set aside during migration. A record only                   |
 
 **Each `hidden_services/` key _is_ its `.onion` address** — lose it and the address is gone for good. Everything Tor can rebuild lives under `data/`, which is what makes a reset a matter of deleting that one directory.
 
@@ -80,11 +80,11 @@ Inside the `tor` volume:
 | `store.json` | `startos` | JSON   | Yes — `FileHelper.json`       | The actions, the URL plugin, init |
 | `torrc`      | `tor`     | Text   | No — written, never read back | `init/renderTorrc`                |
 
-**`store.json` is the source of truth.** It holds `automaticRecovery`, and `onions`: a record keyed `<package>/<host>/<index>`, each entry carrying its `ports` (`externalPort`, `internalPort`, `ssl`). It does not hold a forward target, and nothing in it is ever removed automatically.
+**`store.json` is the source of truth.** It holds `automaticRecovery`, and `onions`: a record keyed `<package>/<host>/<index>`, each entry carrying its `ports` (`externalPort`, `internalPort`, `ssl`). A moved address also carries `keyId`, the original key directory's identity; moving the mapping leaves the key files in place. It does not hold a forward target, and nothing in it is ever removed automatically.
 
 **`torrc` is rendered from it, one way.** A line beginning `# ===== Everything below this line is generated` splits the file:
 
-- **Above the marker is the user's.** It is carried over byte for byte on every render, and Tor honors it. A file with no marker is treated as all user section.
+- **Above the marker is the user's.** Its contents are preserved, with trailing newlines normalized, and Tor honors it. A file with no marker is treated as all user section.
 - **Below the marker is generated** and replaced on every render: `SocksPort`, `DataDirectory`, `ControlSocket`, then a `HiddenServiceDir` block per address. To change it, change the store — through a service's interface page or Tor's actions.
 - Tor takes the **last** value of a single-valued option, so the generated `DataDirectory` wins over one written above the marker. List options such as `SocksPort` are additive, so a user can add a listener but not displace the package's.
 
@@ -119,17 +119,17 @@ Tor registers as StartOS's `url-v0` plugin provider. On every init, and whenever
 | A restore has not reached it yet | Nothing to do — the address is served as soon as its host is bound, in whatever order packages are restored                                                                                                      |
 | A lookup threw                   | Skips it for this pass                                                                                                                                                                                           |
 
-**An unused address** is one none of whose ports belongs to a binding its service still holds: no port is on a disabled binding, and none resolves to a bridge address. It is not written to `torrc` and shows on no interface page. It leaves two ways: Add Onion Service offers it for any interface of the same host, which is how an address survives a service renumbering a port; and Delete Unused Onion Addresses destroys its key.
+**An unused address** is one none of whose ports belongs to a binding its service still holds: no port is on a disabled binding, and none resolves to a bridge address. It is not written to `torrc` and shows on no interface page. It leaves two ways: Add Onion Service offers it for any interface of the same package, even on another host, which is how an address survives a service renumbering a port; and Delete Unused Onion Addresses destroys its key.
 
 ## Installation and First-Run Flow
 
-Nothing to configure. Install seeds `store.json`, renders a `torrc`, starts Tor, and the SOCKS proxy is available once the bootstrap completes. There is no task, no account, and no credential.
+Nothing to configure. Install seeds `store.json` and renders a `torrc`. Start the service; the SOCKS proxy is available once the bootstrap completes. There is no task, no account, and no credential.
 
 **You do not add onion services by hand.** They arrive through the URL plugin when a service is given a Tor address on its interface page.
 
-**An install carrying onion addresses from StartOS 0.3.5 imports them once.** If `onion-migration.json` is present on the `startos` volume, init derives each address from its key, writes the key material into place, and renames the file. Keys that are not properly clamped are skipped.
+**An install carrying onion addresses from StartOS 0.3.5 imports them once.** If `onion-migration.json` is present on the `startos` volume, init derives each address from its key, writes the key material into place, and renames the file. Keys that are not properly clamped are skipped. Valid keys are kept even when their package or host is absent, with an empty port list; retrying an interrupted import recognizes already imported addresses.
 
-**Updating from `0.4.9.12:6` or earlier** runs a migration that reads the onions out of the old `torrc` into `store.json`, sets that file aside as `torrc.legacy`, and moves Tor's state and caches under `data/` so the update does not re-select the server's entry nodes. Relay settings are dropped. The downgrade is prohibited.
+**Updating from a release that used `torrc` as its database** runs a migration that reads the onions out of the old `torrc` into `store.json`, sets that file aside as `torrc.legacy`, and moves Tor's state and caches under `data/` so the update does not re-select the server's entry nodes. Relay settings are dropped and the old relay host is retired, freeing its bindings. The downgrade is prohibited.
 
 ## Actions
 
@@ -137,7 +137,7 @@ Nothing to configure. Install seeds `store.json`, renders a `torrc`, starts Tor,
 
 The plugin's table actions — StartOS invokes them from an interface page.
 
-- **Add** attaches an address to the interface's binding: a new one, optionally from a supplied key, or an existing address of the same host that is unused or does not already cover the binding. Attaching to an existing address sheds any mapping of its whose binding is gone.
+- **Add** attaches an address to the interface's binding: a new one, optionally from a supplied key, or an existing address of the same package. An address in use stays on its host; an entirely unused one can be explicitly moved to another host within that package, retaining its hostname and original key directory. Attaching to an existing address sheds any mapping of its whose binding is gone.
 - **Delete** detaches: it removes that port's mapping and nothing else. The key stays, and an address left with no port becomes unused.
 - **Services call them too.** Both are `access: 'public'`, so any installed service can run them through `effects.action.run` to manage its own addresses — for instance, to move an address back onto a port it renumbered. Each checks the action's `caller` against `urlPluginMetadata.packageId` and refuses a service acting on another's host; the user, whose `caller` is `null`, may act on any. Add runs the check in its input form too, so a service cannot list another's unused addresses either. The input is the one the interface page sends: `urlPluginMetadata` names the package, host, interface and internal port, and `address.selection` is `new` or one of the address ids the form offers.
 
@@ -146,7 +146,7 @@ The plugin's table actions — StartOS invokes them from an interface page.
 The only thing in this package that destroys a key. It lists every unused address with its package and host, all selected by default, and deletes the selected ones with their keys.
 
 - **What counts as unused:** no port of the address is on a disabled binding or resolves to a bridge address. A disabled binding is not served, but its address is kept for when the service enables it again.
-- **What it changes:** deletes the `hidden_services/` directory and the store entry of each selected address. It checks again at run time: if any selected address has come into use since the form opened, it deletes nothing and fails naming them.
+- **What it changes:** deletes the `hidden_services/` directory and the store entry of each selected address. It checks again at run time: if any selected address has come into use since the form opened, it deletes nothing and fails naming them. A binding lookup error also aborts reuse or deletion; it is not evidence that an address is unused.
 - **Repeat safety:** deleting is permanent — the key is the address.
 - **Availability: any status.**
 
@@ -198,7 +198,7 @@ Both volumes are backed up — `sdk.Backups.ofVolumes('tor', 'startos')`. The st
 
 - **This backup contains the private keys behind every `.onion` address on the server.** Anyone holding it can impersonate those addresses.
 - **Restore order does not matter.** Nothing is pruned, so Tor can be restored before, with, or after the services that own its addresses, and each address is served as soon as its host is bound. One whose service never comes back stays unused until Delete Unused Onion Addresses removes it.
-- A backup taken by `0.4.9.12:6` or earlier holds only the `tor` volume; restoring it runs the same migration an update does.
+- A backup taken before the store-based layout holds only the `tor` volume. StartOS restores the package version saved with that backup; updating it then runs the layout migration.
 
 ## Limitations and Differences
 
@@ -208,7 +208,7 @@ Both volumes are backed up — `sdk.Backups.ofVolumes('tor', 'startos')`. The st
 4. **A key is only ever deleted by hand.** Uninstalling a service, or retiring its host or port, leaves its addresses unused rather than deleting them, and installing the service again brings them back.
 5. **The SOCKS proxy is not exported** and is reachable only over loopback and the LXC bridge.
 6. **The `tor` health check can restart the service on its own** while Automatic Recovery is on.
-7. **No relay or bridge mode.** It was removed in `0.4.9.12:7`: a relay's IP address is publicly listed, and a server that is both a listed relay and the host of `.onion` addresses can have the two linked by load and timing measurements, whether or not they share a process. A relay's identity under `keys/` is left in place. On StartOS releases with no way to delete a binding, the old `or-multi` binding remains as a disabled record.
+7. **Run relays and bridges separately from onion hosting.** A relay's IP address is publicly listed, and a server that is both a listed relay and the host of `.onion` addresses can have the two linked by load and timing measurements, whether or not they share a process. A relay's identity under `keys/` is left in place. The migration retires the old `or-multi` host; custom domains assigned to it must be reattached to a current service interface.
 
 ---
 

@@ -108,7 +108,9 @@ const inputSpec = InputSpec.of({
 
       for (const [id, onion] of Object.entries(onions)) {
         const owner = parseOnionId(id)
-        if (owner.packageId !== packageId || owner.hostId !== hostId) continue
+        if (owner.packageId !== packageId) continue
+        const inUse = await isServed(effects, id, onion)
+        if (owner.hostId !== hostId && inUse) continue
 
         const served = onion.ports.filter(
           (p) => p.internalPort === internalPort,
@@ -116,17 +118,14 @@ const inputSpec = InputSpec.of({
         const hasNonSsl = served.some((p) => !p.ssl)
         const hasSsl = served.some((p) => p.ssl)
 
-        // An address of this host that nothing is using is the host's to attach
-        // again. Otherwise skip one that doesn't serve this binding at all, or
-        // is already attached to every binding the interface offers (non-SSL,
-        // plus SSL when available).
-        if (await isServed(effects, id, onion)) {
+        // An address in use stays on its host.
+        if (inUse) {
           if (!hasNonSsl && !hasSsl) continue
           if ((!availNonSsl || hasNonSsl) && (!availSsl || hasSsl)) continue
         }
 
         variants[id] = {
-          name: (await onionHostname(id)) ?? id,
+          name: (await onionHostname(id, onion)) ?? id,
           spec: InputSpec.of({}),
         }
       }
@@ -229,8 +228,20 @@ export const addOnionService = sdk.Action.withInput(
 
     if (address.selection !== 'new') {
       const existing = onions[address.selection]
-      if (!existing) return
+      if (!existing)
+        throw new Error(i18n('This onion address is no longer available'))
+      const owner = parseOnionId(address.selection)
+      if (owner.packageId !== packageId) {
+        throw new Error(i18n('This onion address belongs to another service'))
+      }
+      const moving = owner.hostId !== hostId
+      if (moving && (await isServed(effects, address.selection, existing))) {
+        throw new Error(
+          i18n('Only an unused onion address can move to another host'),
+        )
+      }
       if (
+        !moving &&
         existing.ports.some(
           (p) => p.ssl === ssl && p.internalPort === internalPort,
         )
@@ -251,16 +262,29 @@ export const addOnionService = sdk.Action.withInput(
           Object.keys(host?.bindings ?? {}).map(Number),
         )
         .once()
-      onions[address.selection] = {
-        ...existing,
-        ports: [
-          ...existing.ports.filter(
-            (p) =>
-              bound.includes(p.internalPort) &&
-              p.externalPort !== port.externalPort,
-          ),
-          port,
-        ],
+      if (moving) {
+        const id = onionId(
+          packageId,
+          hostId,
+          await nextIndex(onions, packageId, hostId),
+        )
+        onions[id] = {
+          keyId: existing.keyId ?? address.selection,
+          ports: [port],
+        }
+        delete onions[address.selection]
+      } else {
+        onions[address.selection] = {
+          ...existing,
+          ports: [
+            ...existing.ports.filter(
+              (p) =>
+                bound.includes(p.internalPort) &&
+                p.externalPort !== port.externalPort,
+            ),
+            port,
+          ],
+        }
       }
     } else {
       const id = onionId(

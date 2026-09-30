@@ -44,6 +44,9 @@ const dict = {
   'Permanently delete the keys of .onion addresses that no interface is using': 40,
   'This removes the .onion address from this interface. Its key is kept, so you can attach the address again, until you delete it with Delete Unused Onion Addresses.': 41,
   'Nothing was deleted, because these addresses are now in use:': 42,
+  'This onion address is no longer available': 43,
+  'This onion address belongs to another service': 44,
+  'Only an unused onion address can move to another host': 45,
 } as const
 
 export type I18nKey = keyof typeof dict

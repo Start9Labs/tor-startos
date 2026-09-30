@@ -9,7 +9,7 @@ import { torrcFile } from '../fileModels/torrc'
 import { sdk } from '../sdk'
 import { render, RenderedOnion, userSection } from '../torrc/render'
 import { socksPort } from '../utils'
-import { bindingEnabled } from '../utils/onions'
+import { watchOnionTarget } from '../utils/onions'
 
 /**
  * Renders the torrc from the store and the live bindings. A forward target is
@@ -25,27 +25,19 @@ export const renderTorrc = sdk.setupOnInit(async (effects) => {
   for (const [id, onion] of Object.entries(onions)) {
     const { packageId, hostId } = parseOnionId(id)
     const ports: RenderedOnion['ports'] = []
-    for (const { externalPort, internalPort, ssl } of onion.ports) {
-      // A disabled binding keeps its bridge address, so check it separately:
-      // toggling it does not change the address, and would not re-run this.
-      const enabled = await bindingEnabled(effects, {
-        packageId,
-        hostId,
-        internalPort,
+    for (const port of onion.ports) {
+      const target = await watchOnionTarget(effects, id, port).catch((e) => {
+        console.warn(`Not serving ${id}:${port.externalPort}: ${String(e)}`)
+        return null
       })
-        .const()
-        .catch(() => null)
-      if (!enabled) continue
-      const target = await sdk.host
-        .getBridgeAddress(effects, { packageId, hostId, internalPort, ssl })
-        .const()
-        .catch((e) => {
-          console.warn(`Not serving ${id}:${externalPort}: ${String(e)}`)
-          return null
-        })
-      if (target !== null) ports.push({ externalPort, target })
+      if (target !== null)
+        ports.push({ externalPort: port.externalPort, target })
     }
-    rendered.push({ dir: hsDir(id), label: `${packageId}/${hostId}`, ports })
+    rendered.push({
+      dir: hsDir(id, onion),
+      label: `${packageId}/${hostId}`,
+      ports,
+    })
   }
 
   // Read once: the user's section is carried over, not reacted to here.

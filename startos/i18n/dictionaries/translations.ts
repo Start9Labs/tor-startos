@@ -45,6 +45,9 @@ export default {
     40: 'Elimina de forma permanente las claves de las direcciones .onion que ninguna interfaz está usando',
     41: 'Esto quita la dirección .onion de esta interfaz. Su clave se conserva, de modo que puede volver a asociar la dirección, hasta que la elimine con Eliminar direcciones onion sin usar.',
     42: 'No se eliminó nada, porque estas direcciones ahora están en uso:',
+    43: 'Esta dirección onion ya no está disponible',
+    44: 'Esta dirección onion pertenece a otro servicio',
+    45: 'Solo una dirección onion sin usar puede trasladarse a otro host',
   },
   de_DE: {
     0: 'Tor läuft',
@@ -90,6 +93,9 @@ export default {
     40: 'Löscht dauerhaft die Schlüssel von .onion-Adressen, die keine Schnittstelle verwendet',
     41: 'Dadurch wird die .onion-Adresse von dieser Schnittstelle entfernt. Ihr Schlüssel bleibt erhalten, sodass Sie die Adresse wieder zuordnen können, bis Sie ihn mit „Ungenutzte Onion-Adressen löschen“ löschen.',
     42: 'Es wurde nichts gelöscht, weil diese Adressen inzwischen verwendet werden:',
+    43: 'Diese Onion-Adresse ist nicht mehr verfügbar',
+    44: 'Diese Onion-Adresse gehört zu einem anderen Dienst',
+    45: 'Nur eine ungenutzte Onion-Adresse kann auf einen anderen Host verschoben werden',
   },
   pl_PL: {
     0: 'Tor działa',
@@ -135,6 +141,9 @@ export default {
     40: 'Trwale usuwa klucze adresów .onion, których nie używa żaden interfejs',
     41: 'To usuwa adres .onion z tego interfejsu. Jego klucz zostaje zachowany, więc możesz ponownie przypisać adres, dopóki nie usuniesz go akcją Usuń nieużywane adresy onion.',
     42: 'Nic nie zostało usunięte, ponieważ te adresy są teraz w użyciu:',
+    43: 'Ten adres onion nie jest już dostępny',
+    44: 'Ten adres onion należy do innej usługi',
+    45: 'Tylko nieużywany adres onion można przenieść na inny host',
   },
   fr_FR: {
     0: 'Tor fonctionne',
@@ -180,5 +189,8 @@ export default {
     40: "Supprime définitivement les clés des adresses .onion qu'aucune interface n'utilise",
     41: "Ceci retire l'adresse .onion de cette interface. Sa clé est conservée : vous pouvez rattacher l'adresse, jusqu'à ce que vous la supprimiez avec Supprimer les adresses onion inutilisées.",
     42: "Rien n'a été supprimé, car ces adresses sont désormais utilisées :",
+    43: "Cette adresse onion n'est plus disponible",
+    44: 'Cette adresse onion appartient à un autre service',
+    45: 'Seule une adresse onion inutilisée peut être déplacée vers un autre hôte',
   },
 } satisfies Record<string, LangDict>

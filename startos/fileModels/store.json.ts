@@ -11,6 +11,7 @@ const portShape = z.object({
 })
 
 const onionShape = z.object({
+  keyId: z.string().optional(),
   /**
    * What the address forwards. Nothing here is ever removed automatically: a
    * mapping whose binding is gone is simply not rendered, and resumes if the
@@ -48,8 +49,8 @@ export function parseOnionId(id: string) {
 }
 
 /** The HiddenServiceDir, relative to the tor volume. */
-export function hsDir(id: string) {
-  const { packageId, hostId, index } = parseOnionId(id)
+export function hsDir(id: string, onion?: Onion) {
+  const { packageId, hostId, index } = parseOnionId(onion?.keyId ?? id)
   return `hidden_services/${packageId}/${hostId}/hs_${index}`
 }
 

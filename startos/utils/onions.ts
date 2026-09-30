@@ -1,5 +1,5 @@
 import { T } from '@start9labs/start-sdk'
-import { hsDir, Onion, parseOnionId } from '../fileModels/store.json'
+import { hsDir, Onion, OnionPort, parseOnionId } from '../fileModels/store.json'
 import { sdk } from '../sdk'
 
 /**
@@ -15,9 +15,9 @@ export function requireOwner(caller: string | null, packageId?: string) {
 }
 
 /** The address's .onion hostname, or null before its key is written. */
-export const onionHostname = (id: string) =>
+export const onionHostname = (id: string, onion?: Onion) =>
   sdk.volumes.tor
-    .readFile(`${hsDir(id)}/hostname`)
+    .readFile(`${hsDir(id, onion)}/hostname`)
     .then((content) => content.toString().trim())
     .catch(() => null)
 
@@ -36,6 +36,23 @@ export const bindingEnabled = (
     (host) => host?.bindings[opts.internalPort]?.enabled ?? null,
   )
 
+export async function watchOnionTarget(
+  effects: T.Effects,
+  id: string,
+  { internalPort, ssl }: OnionPort,
+) {
+  const { packageId, hostId } = parseOnionId(id)
+  const enabled = await bindingEnabled(effects, {
+    packageId,
+    hostId,
+    internalPort,
+  }).const()
+  if (!enabled) return null
+  return sdk.host
+    .getBridgeAddress(effects, { packageId, hostId, internalPort, ssl })
+    .const()
+}
+
 /**
  * Whether any port of the address belongs to its service right now: an enabled
  * binding that resolves, or a disabled one. A disabled binding is not served,
@@ -49,15 +66,12 @@ export async function isServed(effects: T.Effects, id: string, onion: Onion) {
       packageId,
       hostId,
       internalPort,
-    })
-      .once()
-      .catch(() => null)
+    }).once()
     if (enabled === false) return true
     if (enabled === null) continue
     const target = await sdk.host
       .getBridgeAddress(effects, { packageId, hostId, internalPort, ssl })
       .once()
-      .catch(() => null)
     if (target !== null) return true
   }
   return false

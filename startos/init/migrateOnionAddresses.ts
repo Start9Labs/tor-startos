@@ -4,6 +4,7 @@ import {
   hsDir,
   nextIndex,
   onionId,
+  parseOnionId,
   OnionPort,
   present,
   storeJson,
@@ -11,6 +12,7 @@ import {
 } from '../fileModels/store.json'
 import { sdk } from '../sdk'
 import { generateOnionFiles, isClamped } from '../utils'
+import { onionHostname } from '../utils/onions'
 
 const migrationEntryShape = z.object({
   packageId: z.string(),
@@ -41,12 +43,22 @@ export const migrateOnionAddresses = sdk.setupOnInit(async (effects) => {
     const keyBytes = Buffer.from(key, 'base64')
     if (keyBytes.length < 64 || !isClamped(keyBytes.subarray(0, 32))) continue
 
+    const { secretKey, hostname } = generateOnionFiles(key)
+    const existing = await Promise.all(
+      Object.entries(onions)
+        .filter(([id]) => {
+          const owner = parseOnionId(id)
+          return owner.packageId === packageId && owner.hostId === hostId
+        })
+        .map(([id, onion]) => onionHostname(id, onion)),
+    )
+    if (existing.includes(hostname)) continue
+
     const host = await sdk.host.get(effects, { hostId, packageId }).once()
-    if (!host) continue // package/host not installed, skip
 
     // Keyed by external port: an address answers on each port once.
     const ports = new Map<number, OnionPort>()
-    for (const [internalPortStr, b] of Object.entries(host.bindings)) {
+    for (const [internalPortStr, b] of Object.entries(host?.bindings ?? {})) {
       if (!b.enabled) continue
       const internalPort = Number(internalPortStr)
       // A native-SSL binding terminates its own TLS and has no plaintext leg;
@@ -70,7 +82,6 @@ export const migrateOnionAddresses = sdk.setupOnInit(async (effects) => {
       hostId,
       await nextIndex(onions, packageId, hostId),
     )
-    const { secretKey, hostname } = generateOnionFiles(key)
     const dir = hsDir(id)
     await sdk.volumes.tor.writeFile(`${dir}/hs_ed25519_secret_key`, secretKey)
     await sdk.volumes.tor.writeFile(`${dir}/hostname`, hostname + '\n')
