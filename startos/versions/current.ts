@@ -9,7 +9,6 @@ import {
 } from '../fileModels/store.json'
 import { torrcFile } from '../fileModels/torrc'
 import { sdk } from '../sdk'
-import { torVersion } from '../manifest'
 import { hasMarker } from '../torrc/render'
 import { torrc as legacyTorrc } from './legacy/torrc'
 
@@ -26,7 +25,7 @@ const NOT_TOR_DATA = [
 ]
 
 export const current = VersionInfo.of({
-  version: `${torVersion}:0`,
+  version: '0.4.9.13:1',
   releaseNotes: {
     en_US: `**Relay and bridge mode have been removed.** A Tor relay's IP address is listed in Tor's public directory. When the same server also hosts .onion addresses, that listing gives an attacker a short list of servers to test, and load and timing measurements can then link an onion address to the server's IP. Running the two as separate processes does not prevent this; sharing a server is enough. The Tor Project advises against hosting onion services on a relay, and nearly every StartOS server hosts them, so this package no longer offers both. Relay support is planned to return as a separate service.
 

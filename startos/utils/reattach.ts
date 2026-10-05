@@ -9,7 +9,7 @@ import {
 type Sdk = ReturnType<StartSdk<T.SDKManifest>['build']>
 
 /** The first Tor release whose Add Onion Service a service may run for its own hosts. */
-const servicesMayAttach = VersionRange.parse('>=0.4.9.13:0')
+const servicesMayAttach = VersionRange.parse('>=0.4.9.13:1')
 
 export type OnionReattachment = {
   /** The calling package's own id. */
