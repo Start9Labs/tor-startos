@@ -26,7 +26,7 @@ const NOT_TOR_DATA = [
 ]
 
 export const current = VersionInfo.of({
-  version: `${torVersion}:1`,
+  version: `${torVersion}:0`,
   releaseNotes: {
     en_US: `**Relay and bridge mode have been removed.** A Tor relay's IP address is listed in Tor's public directory. When the same server also hosts .onion addresses, that listing gives an attacker a short list of servers to test, and load and timing measurements can then link an onion address to the server's IP. Running the two as separate processes does not prevent this; sharing a server is enough. The Tor Project advises against hosting onion services on a relay, and nearly every StartOS server hosts them, so this package no longer offers both. Relay support is planned to return as a separate service.
 
@@ -36,7 +36,8 @@ If you were running a relay, it stops with this update. The Tor Relay OR Port in
 - An .onion address now follows its service when that service's ports move.
 - The key behind an .onion address is never deleted automatically. An address no interface is using stays until you delete it with Delete Unused Onion Addresses, which replaces Delete Onion Addresses.
 - Restoring Tor before the services that use its .onion addresses no longer deletes those addresses.
-- You can add your own options to the top of Tor's configuration file, and they are kept.`,
+- You can add your own options to the top of Tor's configuration file, and they are kept.
+- Updated Tor to 0.4.9.13. [Full upstream release notes](https://gitlab.torproject.org/tpo/core/tor/-/tags/tor-0.4.9.13).`,
     es_ES: `**Se han eliminado los modos de relé y de puente.** La dirección IP de un relé de Tor aparece en el directorio público de Tor. Cuando el mismo servidor aloja además direcciones .onion, esa lista le da a un atacante un conjunto reducido de servidores que probar, y las mediciones de carga y de tiempos pueden entonces vincular una dirección onion con la IP del servidor. Ejecutar ambos como procesos separados no lo impide; basta con que compartan servidor. El Proyecto Tor desaconseja alojar servicios onion en un relé, y casi todos los servidores StartOS los alojan, así que este paquete ya no ofrece ambas cosas. Está previsto que el relé vuelva como un servicio aparte.
 
 Si tenía un relé en marcha, se detiene con esta actualización. La interfaz Puerto OR del relé de Tor desaparece, así que puede eliminar cualquier redirección de puertos que hubiera creado en su router. Las claves de identidad de su relé siguen en el volumen de Tor y en sus copias de seguridad. Se retira el antiguo host del relé; vuelva a asociar los dominios personalizados que le haya asignado a una interfaz de servicio actual.
@@ -45,7 +46,8 @@ Si tenía un relé en marcha, se detiene con esta actualización. La interfaz Pu
 - Una dirección .onion ahora sigue a su servicio cuando cambian los puertos de este.
 - La clave de una dirección .onion nunca se elimina automáticamente. Una dirección que ninguna interfaz usa permanece hasta que la elimine con Eliminar direcciones onion sin usar, que sustituye a Eliminar direcciones onion.
 - Restaurar Tor antes que los servicios que usan sus direcciones .onion ya no elimina esas direcciones.
-- Puede añadir sus propias opciones al principio del archivo de configuración de Tor, y se conservan.`,
+- Puede añadir sus propias opciones al principio del archivo de configuración de Tor, y se conservan.
+- Tor actualizado a 0.4.9.13. [Notas completas de la versión original](https://gitlab.torproject.org/tpo/core/tor/-/tags/tor-0.4.9.13).`,
     de_DE: `**Relay- und Bridge-Modus wurden entfernt.** Die IP-Adresse eines Tor-Relays steht im öffentlichen Verzeichnis von Tor. Hostet derselbe Server auch .onion-Adressen, liefert dieses Verzeichnis einem Angreifer eine kurze Liste von Servern zum Testen, und Last- und Zeitmessungen können dann eine Onion-Adresse mit der IP des Servers verknüpfen. Beides als getrennte Prozesse zu betreiben verhindert das nicht; ein gemeinsamer Server genügt. Das Tor-Projekt rät davon ab, Onion-Dienste auf einem Relay zu hosten, und fast jeder StartOS-Server hostet sie, daher bietet dieses Paket nicht mehr beides an. Die Relay-Unterstützung soll als eigener Dienst zurückkehren.
 
 Falls Sie ein Relay betrieben haben, endet es mit diesem Update. Die Schnittstelle „Tor-Relay-OR-Port“ entfällt, sodass Sie eine dafür im Router eingerichtete Portweiterleitung entfernen können. Die Identitätsschlüssel Ihres Relays bleiben auf dem Tor-Volume und in dessen Backups erhalten. Der alte Relay-Host wird entfernt; ordnen Sie dessen benutzerdefinierte Domains einer aktuellen Dienstschnittstelle zu.
@@ -54,7 +56,8 @@ Falls Sie ein Relay betrieben haben, endet es mit diesem Update. Die Schnittstel
 - Eine .onion-Adresse folgt jetzt ihrem Dienst, wenn sich dessen Ports ändern.
 - Der Schlüssel einer .onion-Adresse wird nie automatisch gelöscht. Eine Adresse, die keine Schnittstelle verwendet, bleibt erhalten, bis Sie sie mit „Ungenutzte Onion-Adressen löschen“ löschen; diese Aktion ersetzt „Onion-Adressen löschen“.
 - Wird Tor vor den Diensten wiederhergestellt, die seine .onion-Adressen nutzen, werden diese Adressen nicht mehr gelöscht.
-- Sie können am Anfang der Tor-Konfigurationsdatei eigene Optionen eintragen; sie bleiben erhalten.`,
+- Sie können am Anfang der Tor-Konfigurationsdatei eigene Optionen eintragen; sie bleiben erhalten.
+- Tor auf 0.4.9.13 aktualisiert. [Vollständige Versionshinweise des Originalprojekts](https://gitlab.torproject.org/tpo/core/tor/-/tags/tor-0.4.9.13).`,
     pl_PL: `**Tryb przekaźnika i mostka został usunięty.** Adres IP przekaźnika Tor jest widoczny w publicznym katalogu Tora. Gdy ten sam serwer hostuje także adresy .onion, katalog ten daje atakującemu krótką listę serwerów do sprawdzenia, a pomiary obciążenia i czasu mogą wtedy powiązać adres onion z adresem IP serwera. Uruchomienie obu jako osobnych procesów temu nie zapobiega; wystarczy wspólny serwer. Projekt Tor odradza hostowanie usług onion na przekaźniku, a niemal każdy serwer StartOS je hostuje, dlatego ten pakiet nie oferuje już obu naraz. Obsługa przekaźnika ma wrócić jako osobna usługa.
 
 Jeśli prowadziłeś przekaźnik, ta aktualizacja go zatrzymuje. Interfejs Port OR przekaźnika Tor znika, więc możesz usunąć przekierowanie portu utworzone dla niego na routerze. Klucze tożsamości przekaźnika pozostają na wolumenie Tora i w jego kopiach zapasowych. Stary host przekaźnika zostaje wycofany; przypisz jego niestandardowe domeny do aktualnego interfejsu usługi.
@@ -63,7 +66,8 @@ Jeśli prowadziłeś przekaźnik, ta aktualizacja go zatrzymuje. Interfejs Port 
 - Adres .onion podąża teraz za swoją usługą, gdy zmieniają się jej porty.
 - Klucz adresu .onion nigdy nie jest usuwany automatycznie. Adres, którego nie używa żaden interfejs, pozostaje, dopóki nie usuniesz go akcją Usuń nieużywane adresy onion, która zastępuje akcję Usuń adresy onion.
 - Przywrócenie Tora przed usługami korzystającymi z jego adresów .onion nie usuwa już tych adresów.
-- Możesz dodać własne opcje na początku pliku konfiguracyjnego Tora i zostaną one zachowane.`,
+- Możesz dodać własne opcje na początku pliku konfiguracyjnego Tora i zostaną one zachowane.
+- Zaktualizowano Tor do wersji 0.4.9.13. [Pełne informacje o wydaniu projektu źródłowego](https://gitlab.torproject.org/tpo/core/tor/-/tags/tor-0.4.9.13).`,
     fr_FR: `**Les modes relais et pont ont été supprimés.** L'adresse IP d'un relais Tor figure dans l'annuaire public de Tor. Lorsque le même serveur héberge aussi des adresses .onion, cet annuaire fournit à un attaquant une courte liste de serveurs à tester, et des mesures de charge et de temps peuvent alors relier une adresse onion à l'IP du serveur. Les exécuter dans des processus séparés n'y change rien ; partager un serveur suffit. Le Projet Tor déconseille d'héberger des services onion sur un relais, et presque tous les serveurs StartOS en hébergent : ce paquet ne propose donc plus les deux. La prise en charge du relais devrait revenir sous forme de service distinct.
 
 Si vous faisiez tourner un relais, il s'arrête avec cette mise à jour. L'interface Port OR du relais Tor disparaît ; vous pouvez donc supprimer la redirection de port créée pour elle sur votre routeur. Les clés d'identité de votre relais restent sur le volume Tor et dans ses sauvegardes. L'ancien hôte du relais est retiré ; rattachez ses domaines personnalisés à une interface de service actuelle.
@@ -72,7 +76,8 @@ Si vous faisiez tourner un relais, il s'arrête avec cette mise à jour. L'inter
 - Une adresse .onion suit désormais son service lorsque les ports de celui-ci changent.
 - La clé d'une adresse .onion n'est jamais supprimée automatiquement. Une adresse qu'aucune interface n'utilise reste en place jusqu'à ce que vous la supprimiez avec Supprimer les adresses onion inutilisées, qui remplace Supprimer les adresses onion.
 - Restaurer Tor avant les services qui utilisent ses adresses .onion ne supprime plus ces adresses.
-- Vous pouvez ajouter vos propres options au début du fichier de configuration de Tor ; elles sont conservées.`,
+- Vous pouvez ajouter vos propres options au début du fichier de configuration de Tor ; elles sont conservées.
+- Tor mis à jour vers la version 0.4.9.13. [Notes de version complètes du projet d'origine](https://gitlab.torproject.org/tpo/core/tor/-/tags/tor-0.4.9.13).`,
   },
   migrations: {
     /**

@@ -1,27 +1,12 @@
 {
   "name": "tor-startos",
   "scripts": {
-    "build": "rm -rf ./javascript && ncc build startos/index.ts -o ./javascript",
-    "prettier": "prettier --write startos",
-    "check": "tsc --noEmit && npm run test",
     "test": "node --test test/*.test.cjs"
   },
   "dependencies": {
     "@noble/curves": "*",
-    "@start9labs/start-sdk": "2.0.9",
+    "@start9labs/start-sdk": "3.0.1",
     "rfc4648": "^1.5.4"
-  },
-  "devDependencies": {
-    "@types/node": "^22.19.7",
-    "@vercel/ncc": "^0.38.4",
-    "prettier": "^3.8.1",
-    "typescript": "^6.0.3"
-  },
-  "prettier": {
-    "trailingComma": "all",
-    "tabWidth": 2,
-    "semi": false,
-    "singleQuote": true
   },
   "overrides": {
     "@start9labs/start-sdk": "$@start9labs/start-sdk"

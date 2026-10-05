@@ -3,7 +3,7 @@ import { VersionInfo, z } from '@start9labs/start-sdk'
 import { sdk } from '../sdk'
 import { autoWiped, wipeRequested } from '../utils/recovery'
 
-const legacyWatchdogShape = z.object({
+const legacyWatchdogShape = z.looseObject({
   wipeRequested: z.boolean().catch(false),
   autoWiped: z.boolean().catch(false),
 })

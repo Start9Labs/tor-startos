@@ -2,7 +2,7 @@ import { access } from 'node:fs/promises'
 import { FileHelper, z } from '@start9labs/start-sdk'
 import { sdk } from '../sdk'
 
-const portShape = z.object({
+const portShape = z.looseObject({
   /** The port the .onion address answers on. */
   externalPort: z.number(),
   /** The binding it forwards to. The forward target itself is never stored. */
@@ -10,7 +10,7 @@ const portShape = z.object({
   ssl: z.boolean(),
 })
 
-const onionShape = z.object({
+const onionShape = z.looseObject({
   keyId: z.string().optional(),
   /**
    * What the address forwards. Nothing here is ever removed automatically: a
@@ -20,7 +20,7 @@ const onionShape = z.object({
   ports: z.array(portShape).catch([]),
 })
 
-const shape = z.object({
+const shape = z.looseObject({
   /** Keyed by `onionId`. An entry that fails to parse is dropped alone. */
   onions: z
     .record(z.string(), onionShape.optional().catch(undefined))

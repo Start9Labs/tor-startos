@@ -2,7 +2,7 @@ import { FileHelper, z } from '@start9labs/start-sdk'
 import { sdk } from '../../sdk'
 import { socksPort } from '../../utils'
 
-const portInfoShape = z.object({
+const portInfoShape = z.looseObject({
   target: z.string().nullable(),
   ssl: z.boolean(),
   internalPort: z.number(),
@@ -10,12 +10,12 @@ const portInfoShape = z.object({
 type PortInfo = z.infer<typeof portInfoShape>
 
 export const onionServiceEntryShape = z
-  .object({
+  .looseObject({
     ports: z.record(z.string(), portInfoShape.optional().catch(undefined)),
   })
   .catch({ ports: {} })
 
-export const relayShape = z.object({
+export const relayShape = z.looseObject({
   enabled: z.boolean().catch(false),
   nickname: z.string().min(1).optional().catch(undefined),
   contactInfo: z.string().optional().catch(undefined),
@@ -25,7 +25,7 @@ export const relayShape = z.object({
   bandwidthBurst: z.number().catch(2048),
 })
 
-const shape = z.object({
+const shape = z.looseObject({
   onionServices: z
     .record(
       z.string(),
@@ -55,7 +55,7 @@ const shape = z.object({
   // binding by init/advertiseRelay. `orPort` is the configured port it was
   // derived for, so changing the OR port drops it until it is derived again.
   advertise: z
-    .object({
+    .looseObject({
       orPort: z.number().nullable().catch(null),
       address: z.string().nullable().catch(null),
       port: z.number().nullable().catch(null),

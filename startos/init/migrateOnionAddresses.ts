@@ -14,7 +14,7 @@ import { sdk } from '../sdk'
 import { generateOnionFiles, isClamped } from '../utils'
 import { onionHostname } from '../utils/onions'
 
-const migrationEntryShape = z.object({
+const migrationEntryShape = z.looseObject({
   packageId: z.string(),
   hostId: z.string(),
   hostname: z.string(),
@@ -23,7 +23,7 @@ const migrationEntryShape = z.object({
 
 const migrationFile = FileHelper.json(
   { base: sdk.volumes.startos, subpath: 'onion-migration.json' },
-  z.object({ addresses: z.array(migrationEntryShape) }),
+  z.looseObject({ addresses: z.array(migrationEntryShape) }),
 )
 
 /** Imports, once, the onion addresses a StartOS 0.3.5 server carried. */
