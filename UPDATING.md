@@ -1,6 +1,6 @@
 # Updating the upstream version
 
-The upstream version is `torVersion` in `startos/manifest/index.ts`. It supplies the Docker build's `TOR_VERSION` argument and the upstream component of `startos/versions/current.ts`. The Dockerfile installs that exact Alpine package version, including the `-r0` packaging revision.
+The upstream version is `torVersion` in `startos/manifest/index.ts`. It supplies the Docker build's `TOR_VERSION` argument, and the Dockerfile installs that exact Alpine package version, including the `-r0` packaging revision. `startos/versions/current.ts` repeats it as the upstream component of a quoted `version` literal, which release CI reads, so the two must match.
 
 ## Determining the upstream version
 
@@ -44,6 +44,6 @@ The base-image pin lives in `Dockerfile` (`FROM alpine:<tag>`). Move it when the
 ## Applying the bump
 
 1. Verify Alpine publishes the desired Tor package for every supported architecture.
-2. Update `torVersion` in `startos/manifest/index.ts`, the downstream revision and release notes in `startos/versions/current.ts`, and the Alpine packaging revision in the Dockerfile if needed.
+2. Update `torVersion` in `startos/manifest/index.ts`, the version (upstream component and downstream revision) and release notes in `startos/versions/current.ts`, and the Alpine packaging revision in the Dockerfile if needed.
 3. Build the packages. The explicit package selector and build argument make a version change invalidate the cached Tor-install layer.
 4. Verify the binary with `start-cli package attach tor -n tor-sub -- tor --version`, as well as the package manifest version.

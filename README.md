@@ -35,7 +35,7 @@
 
 ## Image and Container Runtime
 
-A minimal Alpine build around the distribution's `tor` package — no upstream image exists to use. The manifest's `torVersion` supplies an exact APK version to the Docker build and the package version's upstream component.
+A minimal Alpine build around the distribution's `tor` package — no upstream image exists to use. The manifest's `torVersion` supplies an exact APK version to the Docker build; `startos/versions/current.ts` repeats it as the package version's upstream component.
 
 | Property      | Value                                   |
 | ------------- | --------------------------------------- |
