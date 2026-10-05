@@ -16,11 +16,13 @@ export type OnionReattachment = {
   packageId: T.PackageId
   /** The host whose unused .onion addresses move. Addresses never change host. */
   hostId: T.HostId
-  /** The interface, and the internal port of its binding, they move to. */
-  interfaceId: T.ServiceInterfaceId
-  internalPort: number
-  /** Whether the onion serves the binding's SSL leg, where Tor's form offers one. */
-  ssl: boolean
+  /** The replacement binding they move to — never the retired one. */
+  to: {
+    interfaceId: T.ServiceInterfaceId
+    internalPort: number
+    /** Whether the onion serves the binding's SSL leg, where Tor's form offers one. */
+    ssl: boolean
+  }
   /** Reads the flag the migration that retired the old binding set. */
   pending: { const(effects: T.Effects): Promise<boolean | null | undefined> }
   /** Clears it, once every unused address has moved. */
@@ -40,8 +42,8 @@ export function setupOnionReattachment(
   const urlPluginMetadata = {
     packageId: opts.packageId,
     hostId: opts.hostId,
-    interfaceId: opts.interfaceId,
-    internalPort: opts.internalPort,
+    interfaceId: opts.to.interfaceId,
+    internalPort: opts.to.internalPort,
   }
 
   async function unusedOnions(effects: T.Effects): Promise<string[]> {
@@ -84,7 +86,7 @@ export function setupOnionReattachment(
       .get(
         effects,
         { hostId: opts.hostId, packageId: opts.packageId },
-        (host) => host?.bindings[opts.internalPort]?.enabled ?? false,
+        (host) => host?.bindings[opts.to.internalPort]?.enabled ?? false,
       )
       .const()
     if (!enabled) return
@@ -107,7 +109,7 @@ export function setupOnionReattachment(
           prefill: { urlPluginMetadata },
           input: ({ spec }) => ({
             urlPluginMetadata,
-            ...('ssl' in spec ? { ssl: opts.ssl } : {}),
+            ...('ssl' in spec ? { ssl: opts.to.ssl } : {}),
             address: { selection, value: {} },
           }),
         })
