@@ -18,21 +18,23 @@ Freshly scaffolded? Work the
 guide page, not a file in this repo — read it, don't copy it in.
 
 Keep `README.md` (technical reference for an AI support or administering agent) and
-`instructions.md` (end-user docs) in sync with your changes.
+`instructions.md` (end-user docs) in sync with your changes. This file restates neither:
+whoever changes the package has both, so it carries only what they don't — repo mechanics,
+a change that looks right and is not, where the next thing gets added, a naming trap, a
+build or test invocation particular to this repo.
 
-**Bugs and feature requests are GitHub issues on this repo** — file them as you find them.
+**Fix a defect you spot rather than reporting it** — you have the package open and the
+context to be sure. File **a GitHub issue on this repo** only when the call isn't yours to
+make: you can't pin the cause down, two defensible fixes exist, or it's too large to ride on
+the work in hand. An open issue is a report, not a queue — implement one when you're asked
+to or when it's labelled `Approved`, then close it with `Closes #<n>`.
+
 Don't record work in the repo instead: no `TODO.md`, no `NOTES.md`, no `PLAN.md`. What you
 verified, tried, and decided belongs in the commit message and the PR body.
 
 ## This repo
 
-- **`socksHostId` and `socksPort` in `startos/utils/` are a published contract.** Sixteen packaging repos across both registries import them from `tor-startos/startos/utils`, and nothing in this repo references them — so renaming either, or moving them off that module path, breaks every dependent with no signal here. `utils/` resolves through its `index.ts`, which makes the directory name load-bearing too.
-- **The wipe must happen in `main` before any daemon is constructed.** A running Tor holds its network state in memory and flushes it on shutdown, so deleting the files underneath it writes the same entry nodes straight back. That is why the wipe is queued to a file and applied at the next start.
-- **`PRESERVE` is an allow-list on purpose.** A wipe that misses a cache file leaves the bad entry node in place — the exact failure being recovered from. Anything new the package persists on the `tor` volume must be added to it.
-- **The watchdog's flags are files whose presence is the value — don't turn them into a file model.** The Reset Tor Connection action and the health check write them from different processes, and a `FileHelper.merge` is an unlocked read-modify-write: one writer loses, and a torn JSON file stops the service starting.
-- **The watchdog wipes at most once per outage.** Past that the cause is not stale state, and retrying just restarts the service in a loop; the check reports the failure instead.
-- **Any bootstrap-percentage movement resets the stall clock but not the attempt ladder.** Only a healthy reading resets the ladder — otherwise a Tor that crawls forward a percent at a time never escalates.
-- **The `# @service` / `# @ssl` / `# @internalPort` comments in `torrc` are structural.** There is no round-trippable torrc format, so the parser reconstructs package id, host id, and upstream port from them. Stripping them loses that mapping.
-- **Onion-service indexes are never reused after a deletion.** The index is a `HiddenServiceDir` path holding key material; reusing one would put a new service on a stale key directory. An entry with no ports is not written, which frees its index the same way — park a port with a null target rather than removing it.
-- **Prune only on a confirmed-gone package — a missing host proves nothing.** `sdk.host.get` returning null means the host is gone _or not bound yet_: a batch restore writes every package's entry before any of them inits, and the host appears only when that package's own init binds it. So a null host with the package still present keeps its entry and keys, unexported, until the host watch fires; a thrown lookup means unknown and keeps them too. Read the package's status with `.once()`, never `.const()` — a status watch re-fires on every health tick of the target. And map the host to a boolean before `.const()` — subscribing to the whole host re-fires on the export phase's own writes and spins the pass indefinitely.
-- **Reconcile onion targets ahead of `reloadTorrc`.** Both are init handlers and `setupInit` runs them in order, so the repair reaches Tor in the first pass rather than the next one. Every later repair reaches it through `reloadTorrc`'s own `torrc` watch, because a `.const()` retry re-runs only the handler that registered it. `getBridgeAddress` subscribes to the whole host like anything else; what keeps it from spinning on the export phase's writes is that it yields a single address string, which the watcher deduplicates.
+- **`startos/utils/index.ts` (`socksHostId`, `socksPort`) and `startos/utils/reattach.ts` (`setupOnionReattachment`) are a published contract.** Other packaging repos import them by those paths, and nothing in this repo references them, so a rename or move breaks every dependent with no signal here. `reattach.ts` imports `@start9labs/start-sdk` alone: anything it imports from this repo lands in every consumer's bundle.
+- **Anything the package persists on the `tor` volume goes outside `data/`.** That directory is Tor's `DataDirectory` and Reset Tor Connection deletes it whole; there is no allow-list to add a new file to.
+- **`startos/versions/legacy/torrc.ts` is frozen.** It is the two-way `torrc` model earlier releases used, relay parsing included, and the historical and current layout migrations read old volumes through it. Nothing else may import it, and tidying it changes what those migrations see.
+- **`requireOwner` is the only thing keeping one service off another's onion addresses.** Add Onion Service and Delete Onion Service are `access: 'public'`, so every installed service can run them; any new action or input form that touches an address by `urlPluginMetadata.packageId` calls it with the action's `caller`.

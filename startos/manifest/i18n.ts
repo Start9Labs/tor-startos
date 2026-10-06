@@ -10,15 +10,15 @@ export default {
     },
     long: {
       en_US:
-        'Run onion services (.onion addresses) to make your installed apps accessible over the Tor network. Provides a SOCKS5 proxy for private browsing and can optionally operate as a Tor relay or bridge to support the network.',
+        'Run onion services (.onion addresses) to make your installed apps accessible over the Tor network. Provides a SOCKS5 proxy your other services use to reach the Tor network.',
       es_ES:
-        'Ejecute servicios onion (direcciones .onion) para hacer accesibles sus aplicaciones instaladas a través de la red Tor. Proporciona un proxy SOCKS5 para navegación privada y opcionalmente puede operar como un relé o puente Tor para apoyar la red.',
+        'Ejecute servicios onion (direcciones .onion) para hacer accesibles sus aplicaciones instaladas a través de la red Tor. Proporciona un proxy SOCKS5 que sus otros servicios usan para acceder a la red Tor.',
       de_DE:
-        'Betreiben Sie Onion-Dienste (.onion-Adressen), um Ihre installierten Apps über das Tor-Netzwerk zugänglich zu machen. Bietet einen SOCKS5-Proxy für privates Surfen und kann optional als Tor-Relay oder Bridge betrieben werden.',
+        'Betreiben Sie Onion-Dienste (.onion-Adressen), um Ihre installierten Apps über das Tor-Netzwerk zugänglich zu machen. Bietet einen SOCKS5-Proxy, über den Ihre anderen Dienste das Tor-Netzwerk erreichen.',
       pl_PL:
-        'Uruchom usługi onion (adresy .onion), aby udostępnić zainstalowane aplikacje przez sieć Tor. Zapewnia proxy SOCKS5 do prywatnego przeglądania i opcjonalnie może działać jako przekaźnik lub most Tor.',
+        'Uruchom usługi onion (adresy .onion), aby udostępnić zainstalowane aplikacje przez sieć Tor. Zapewnia proxy SOCKS5, przez które Twoje pozostałe usługi łączą się z siecią Tor.',
       fr_FR:
-        'Exécutez des services onion (adresses .onion) pour rendre vos applications installées accessibles via le réseau Tor. Fournit un proxy SOCKS5 pour la navigation privée et peut optionnellement fonctionner comme relais ou pont Tor.',
+        'Exécutez des services onion (adresses .onion) pour rendre vos applications installées accessibles via le réseau Tor. Fournit un proxy SOCKS5 que vos autres services utilisent pour joindre le réseau Tor.',
     },
   },
 }

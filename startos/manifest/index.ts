@@ -1,6 +1,8 @@
 import { setupManifest } from '@start9labs/start-sdk'
 import i18n from './i18n'
 
+export const torVersion = '0.4.9.13'
+
 export const manifest = setupManifest({
   id: 'tor',
   title: 'Tor',
@@ -13,10 +15,9 @@ export const manifest = setupManifest({
   volumes: ['tor', 'startos'],
   images: {
     tor: {
-      source: { dockerBuild: {} },
+      source: { dockerBuild: { buildArgs: { TOR_VERSION: torVersion } } },
       arch: ['x86_64', 'aarch64', 'riscv64'],
     },
   },
-  dependencies: {},
   plugins: ['url-v0'],
 })
