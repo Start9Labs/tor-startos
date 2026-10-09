@@ -1,7 +1,7 @@
 import { setupManifest } from '@start9labs/start-sdk'
 import i18n from './i18n'
 
-export const torVersion = '0.4.9.13'
+export const torVersion = '0.4.9.14'
 
 export const manifest = setupManifest({
   id: 'tor',
