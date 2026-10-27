@@ -26,6 +26,8 @@ const shape = z.looseObject({
     .record(z.string(), onionShape.optional().catch(undefined))
     .catch({}),
   automaticRecovery: z.boolean().catch(true),
+  /** Bridge lines without the `Bridge` keyword. None connects directly. */
+  bridges: z.array(z.string()).catch([]),
 })
 
 export type Onion = z.infer<typeof onionShape>
@@ -70,7 +72,7 @@ export async function writeOnions(
   const store = await storeJson.read().once()
   await storeJson.write(
     effects,
-    { ...(store ?? { automaticRecovery: true }), onions },
+    { ...(store ?? { automaticRecovery: true, bridges: [] }), onions },
     options,
   )
 }

@@ -1,9 +1,15 @@
+import { torrcFile } from './fileModels/torrc'
 import { i18n } from './i18n'
 import { applyPendingWipe, watchdog } from './utils/recovery'
 import { sdk } from './sdk'
 
 export const main = sdk.setupMain(async ({ effects }) => {
   console.info('Starting Tor!')
+
+  // Tor bootstraps through changed bridges only when it starts.
+  const bridges = await torrcFile
+    .read((raw) => raw.split('\n').filter((l) => l.startsWith('Bridge ')))
+    .const(effects)
 
   // Before any daemon exists, so a queued wipe can't be undone by a running Tor
   // flushing its in-memory state back to disk.
@@ -45,7 +51,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
         },
         ready: {
           display: i18n('Tor SOCKS Proxy'),
-          fn: watchdog(effects, wipes),
+          fn: watchdog(effects, wipes, !!bridges?.length),
           // Poll every 1s while bootstrapping. defaultTrigger polls 'loading'
           // only every 30s, so the first "Bootstrapping: 0%" reading stuck for
           // 30s while Tor actually finished — the UI showed 0% long after Tor

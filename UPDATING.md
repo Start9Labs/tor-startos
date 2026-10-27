@@ -17,18 +17,18 @@ Tor versions have four components. The filter selects stable tags and excludes p
 
 ### Tor as packaged by Alpine
 
-Tor lives in Alpine's `community` repository. Check the package index for each supported architecture:
+Tor and its bridge transports, `lyrebird` and `snowflake-client`, live in Alpine's `community` repository. Check the package index for each supported architecture:
 
 ```
 ALPINE_TAG=$(grep -oP '(?<=^FROM alpine:)[0-9.]+' Dockerfile)
 for ARCH in x86_64 aarch64 riscv64; do
   echo "$ARCH"
   curl -fsSL "https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_TAG}/community/${ARCH}/APKINDEX.tar.gz" \
-    | tar -xzO APKINDEX | grep -A1 '^P:tor$'
+    | tar -xzO APKINDEX | grep -E -A1 '^P:(tor|lyrebird|snowflake-client)$'
 done
 ```
 
-The `V:` line gives the exact version and Alpine packaging revision. The desired upstream release must be available for all three architectures before bumping. If its revision differs from `-r0`, update the Dockerfile's exact package selector too.
+The `V:` line gives the exact version and Alpine packaging revision. Only Tor's is pinned. The desired upstream release must be available for all three architectures before bumping. If its revision differs from `-r0`, update the Dockerfile's exact package selector too.
 
 ### Alpine base image
 
@@ -39,7 +39,7 @@ curl -fsSL 'https://hub.docker.com/v2/repositories/library/alpine/tags?page_size
   | jq -r '.results[].name'
 ```
 
-The base-image pin lives in `Dockerfile` (`FROM alpine:<tag>`). Move it when the desired Tor release requires a newer Alpine release.
+The base-image pin lives in `Dockerfile` (`FROM alpine:<tag>`). Move it when the desired Tor release requires a newer Alpine release, and only to one that also publishes `lyrebird` and `snowflake-client` for every supported architecture.
 
 ## Applying the bump
 

@@ -35,7 +35,7 @@
 
 ## Image and Container Runtime
 
-A minimal Alpine build around the distribution's `tor` package — no upstream image exists to use. The manifest's `torVersion` supplies an exact APK version to the Docker build; `startos/versions/current.ts` repeats it as the package version's upstream component.
+A minimal Alpine build around the distribution's `tor` package — no upstream image exists to use. The manifest's `torVersion` supplies an exact APK version to the Docker build; `startos/versions/current.ts` repeats it as the package version's upstream component. The image also carries Alpine's `lyrebird` (obfs4 and WebTunnel) and `snowflake-client` (Snowflake), unpinned: the transport plugins Tor runs as its own child processes while it connects through bridges.
 
 | Property      | Value                                   |
 | ------------- | --------------------------------------- |
@@ -75,17 +75,18 @@ Inside the `tor` volume:
 
 ## File Models
 
-| File         | Volume    | Format | Modelled                      | Written by                        |
-| ------------ | --------- | ------ | ----------------------------- | --------------------------------- |
-| `store.json` | `startos` | JSON   | Yes — `FileHelper.json`       | The actions, the URL plugin, init |
-| `torrc`      | `tor`     | Text   | No — written, never read back | `init/renderTorrc`                |
+| File         | Volume    | Format | Modelled                          | Written by                        |
+| ------------ | --------- | ------ | --------------------------------- | --------------------------------- |
+| `store.json` | `startos` | JSON   | Yes — `FileHelper.json`           | The actions, the URL plugin, init |
+| `torrc`      | `tor`     | Text   | No — written, never read as state | `init/renderTorrc`                |
 
-**`store.json` is the source of truth.** It holds `automaticRecovery`, and `onions`: a record keyed `<package>/<host>/<index>`, each entry carrying its `ports` (`externalPort`, `internalPort`, `ssl`). A moved address also carries `keyId`, the original key directory's identity; moving the mapping leaves the key files in place. It does not hold a forward target, and nothing in it is ever removed automatically.
+**`store.json` is the source of truth.** It holds `automaticRecovery`; `bridges`, the bridge lines Tor connects through, without the `Bridge` keyword, where none means a direct connection; and `onions`: a record keyed `<package>/<host>/<index>`, each entry carrying its `ports` (`externalPort`, `internalPort`, `ssl`). A moved address also carries `keyId`, the original key directory's identity; moving the mapping leaves the key files in place. It does not hold a forward target, and nothing in it is ever removed automatically.
 
 **`torrc` is rendered from it, one way.** A line beginning `# ===== Everything below this line is generated` splits the file:
 
 - **Above the marker is the user's.** Its contents are preserved, with trailing newlines normalized, and Tor honors it. A file with no marker is treated as all user section.
-- **Below the marker is generated** and replaced on every render: `SocksPort`, `DataDirectory`, `ControlSocket`, then a `HiddenServiceDir` block per address. To change it, change the store — through a service's interface page or Tor's actions.
+- **Below the marker is generated** and replaced on every render: `SocksPort`, `DataDirectory`, `ControlSocket`; while bridges are set, `UseBridges 1`, a `ClientTransportPlugin` line for each plugin the bridges need, and a `Bridge` line each; then a `HiddenServiceDir` block per address. To change it, change the store — through a service's interface page or Tor's actions.
+- **A change is reloaded in place, except a change to the `Bridge` lines**, which restarts Tor: Tor bootstraps through new bridges only when it starts.
 - Tor takes the **last** value of a single-valued option, so the generated `DataDirectory` wins over one written above the marker. List options such as `SocksPort` are additive, so a user can add a listener but not displace the package's.
 
 **An onion's forward target is resolved when the file is rendered**, from the live binding, and the render re-runs whenever a target changes. A port with no bridge address is left out, and an address with no port left to forward to is not written at all. Nothing stale is ever kept to point at a port another service might later hold.
@@ -163,6 +164,24 @@ Queues a wipe of `data/` and restarts. The deletion happens at the next start, b
 
 One action whose name, description and confirmation follow the current setting. It flips `automaticRecovery` in `store.json`. Off is **fail closed**: the watchdog never acts, and a stuck Tor stays offline until the user runs Reset Tor Connection.
 
+### Connect via Bridges
+
+Sets the bridges Tor connects through, pasted one per line as bridges.torproject.org and Tor Browser give them. obfs4, WebTunnel and Snowflake lines are accepted; there are no built-in bridges.
+
+- **When to run it:** the server's network blocks Tor, or the user does not want the network to see this server connecting to Tor relays.
+- **What it changes:** `bridges` in `store.json`, rendered into `torrc`. Whitespace is normalized and duplicate lines dropped.
+- **What it refuses**, failing the form and changing nothing: any line other than `obfs4`, `webtunnel` or `snowflake`, an IP address and port, a 40-hex-digit fingerprint, then `key=value` arguments in printable ASCII other than `"`, `#`, `;` and `\`; and, since each would stop Tor from starting, an IP address or port Tor cannot parse, or arguments past Tor's 510-byte limit.
+- **Cost:** Tor restarts and bootstraps through the bridges, which can take several minutes, and everything that uses Tor waits for it. All of Tor's traffic, `.onion` addresses included, then goes through the bridges.
+- **Repeat safety:** replaces the previous bridges. The form opens with the current ones.
+- **What happens next:** the health check shows the bootstrap. Bridges that cannot be reached leave it stuck, and [the watchdog](#the-watchdog) escalates after fifteen minutes without progress rather than five.
+- **Availability: any status.** While stopped, the bridges take effect at the next start.
+
+### Stop Using Bridges
+
+Clears `bridges`, so Tor restarts and connects directly. Listed only while bridges are set. Its confirmation says that the network can then see this server connecting to Tor, and that on a network blocking Tor nothing connects. The bridge lines are not kept.
+
+- **Availability: any status.**
+
 ## Tasks
 
 None.
@@ -179,10 +198,10 @@ The check reads Tor's real state: a bootstrap percentage with Tor's summary line
 
 With Automatic Recovery on, sustained unhealthiness escalates:
 
-1. **Five minutes** with no movement in the bootstrap percentage: drop the pinned entry nodes and open circuits over the control socket (`DROPGUARDS`, `DROPTIMEOUTS`, `NEWNYM`).
+1. **Five minutes** with no movement in the bootstrap percentage, or **fifteen** while Tor connects through bridges, where one phase can take most of five: drop the pinned entry nodes and open circuits over the control socket (`DROPGUARDS`, `DROPTIMEOUTS`, `NEWNYM`).
 2. **Once more**, ten minutes later.
 3. **Twenty minutes after that**, queue a wipe of `data/` and restart.
-4. **It wipes at most once per outage.** If Tor is still broken afterwards the cause is not stale state — most likely the server has no working internet — and the check says so and stops.
+4. **It wipes at most once per outage.** If Tor is still broken afterwards the cause is not stale state — most likely the server has no working internet, or, with bridges set, the bridges are blocked or down — and the check says so and stops.
 
 A healthy reading resets the ladder. With Automatic Recovery off, none of this runs.
 
@@ -190,13 +209,14 @@ A healthy reading resets the ladder. With Automatic Recovery off, none of this r
 
 Tor pins a small set of entry nodes and keeps them for months. That is deliberate: every fresh selection is another chance of picking an entry node run by an adversary, and the entry node is the one relay that sees this server's IP address. Tor's control specification says of `DROPGUARDS`, "Do not invoke this command lightly; it can increase vulnerability to tracking attacks over time."
 
-The watchdog cannot tell a bad entry node from a dead link, so anyone able to interrupt this server's connection for five minutes forces a fresh selection, and can repeat that. For most servers staying reachable matters more, which is why the setting defaults to on. The user-facing text states the trade-off and nothing of this mechanism, on purpose.
+The watchdog cannot tell a bad entry node from a dead link, so anyone able to interrupt this server's connection for five minutes, or fifteen while it connects through bridges, forces a fresh selection, and can repeat that. For most servers staying reachable matters more, which is why the setting defaults to on. The user-facing text states the trade-off and nothing of this mechanism, on purpose.
 
 ## Backups and Restore
 
 Both volumes are backed up — `sdk.Backups.ofVolumes('tor', 'startos')`. The store maps each key directory to the interface it serves, so the two travel together.
 
 - **This backup contains the private keys behind every `.onion` address on the server.** Anyone holding it can impersonate those addresses.
+- **A restore brings back the bridges set when the backup was taken**, and Tor connects through them. On a different network, or once they are blocked, run Connect via Bridges or Stop Using Bridges.
 - **Restore order does not matter.** Nothing is pruned, so Tor can be restored before, with, or after the services that own its addresses, and each address is served as soon as its host is bound. One whose service never comes back stays unused until Delete Unused Onion Addresses removes it.
 - A backup taken before the store-based layout holds only the `tor` volume. StartOS restores the package version saved with that backup; updating it then runs the layout migration.
 
@@ -208,7 +228,8 @@ Both volumes are backed up — `sdk.Backups.ofVolumes('tor', 'startos')`. The st
 4. **A key is only ever deleted by hand.** Uninstalling a service, or retiring its host or port, leaves its addresses unused rather than deleting them, and installing the service again brings them back.
 5. **The SOCKS proxy is not exported** and is reachable only over loopback and the LXC bridge.
 6. **The `tor` health check can restart the service on its own** while Automatic Recovery is on.
-7. **Run relays and bridges separately from onion hosting.** A relay's IP address is publicly listed, and a server that is both a listed relay and the host of `.onion` addresses can have the two linked by load and timing measurements, whether or not they share a process. A relay's identity under `keys/` is left in place. The migration retires the old `or-multi` host; custom domains assigned to it must be reattached to a current service interface.
+7. **Operate a relay or bridge on a server other than the one hosting `.onion` addresses.** A relay's IP address is publicly listed, and a server that is both a listed relay and the host of `.onion` addresses can have the two linked by load and timing measurements, whether or not they share a process. A relay's identity under `keys/` is left in place. The migration retires the old `or-multi` host; custom domains assigned to it must be reattached to a current service interface.
+8. **There are no built-in bridges, and only obfs4, WebTunnel and Snowflake are accepted.** Tor Browser's built-in Snowflake works here by pasting its bridge lines into Connect via Bridges. meek, Conjure and plain bridge lines are refused.
 
 ---
 
@@ -216,7 +237,7 @@ Both volumes are backed up — `sdk.Backups.ofVolumes('tor', 'startos')`. The st
 
 ```yaml
 package_id: tor
-image: ./Dockerfile # FROM alpine, apk add tor
+image: ./Dockerfile # FROM alpine, apk add tor lyrebird snowflake-client
 architectures:
   - x86_64
   - aarch64
@@ -228,7 +249,7 @@ volumes:
   tor: /var/lib/tor
   startos: host side, never mounted (store.json; one-time onion import)
 file_models:
-  - store.json # startos volume; source of truth: onions + automaticRecovery
+  - store.json # startos volume; source of truth: onions + bridges + automaticRecovery
 generated_files:
   - /var/lib/tor/torrc # user section above the marker is kept; the rest is rendered from store.json
 disposable:
@@ -247,6 +268,8 @@ actions:
   - delete-unused-addresses # the only action that destroys a key
   - reset-connection # only-running
   - automatic-recovery # toggles store.json automaticRecovery; off = fail closed
+  - connect-via-bridges # sets store.json bridges from pasted obfs4/webtunnel/snowflake lines; restarts Tor
+  - stop-using-bridges # listed only while bridges are set; clears them, restarts Tor direct
 tasks: []
 health_checks:
   - tor # displayed "Tor SOCKS Proxy"; also the self-recovery watchdog

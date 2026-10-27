@@ -9,6 +9,7 @@
 - A running Tor daemon with a **SOCKS5 proxy** on port 9050 that other StartOS services reach over the internal bridge to connect to `.onion` destinations.
 - The ability to **add a `.onion` address to any interface of any other installed service**, optionally with your own vanity key.
 - **Automatic recovery** when Tor gets stuck connecting, which you can turn off, plus a **Reset Tor Connection** action to fix it yourself.
+- **Bridges** — obfs4, WebTunnel or Snowflake — to reach the Tor network where it is blocked.
 
 ## Warnings
 
@@ -39,6 +40,18 @@ To delete addresses for good, open Tor's **Actions** menu and run **Delete Unuse
 
 Restore Tor and your other services in any order. Each address starts working again as soon as its service is back.
 
+### Connecting through bridges
+
+If your internet provider or country blocks Tor, or you don't want your provider to see that this server uses Tor, Tor can reach the Tor network through bridges.
+
+1. Get bridges. For obfs4 or WebTunnel bridges, use [bridges.torproject.org](https://bridges.torproject.org/), message [@GetBridgesBot](https://t.me/GetBridgesBot) on Telegram, or email bridges@torproject.org from a Gmail or Riseup address. For Snowflake, copy the `snowflake` lines from [Tor Browser's bridge list](https://gitlab.torproject.org/tpo/applications/tor-browser-build/-/raw/main/projects/tor-expert-bundle/pt_config.json), without their quotes.
+2. Open Tor's **Actions** menu, run **Connect via Bridges**, and paste the bridges, one per line.
+3. Tor restarts and connects through them. This can take several minutes, and its health status shows how far it has got. If it stays stuck, the bridges may be blocked or down: get new ones and run the action again.
+
+Everything Tor carries for this server then goes through your bridges, your `.onion` addresses included, so slow bridges make those slow too.
+
+To connect directly again, run **Stop Using Bridges**. Tor forgets your bridges.
+
 ### Tor is stuck connecting
 
 Sometimes Tor cannot connect, or connects but nothing loads, and **restarting it does not help**.
@@ -49,7 +62,7 @@ To fix it yourself without waiting, open Tor's **Actions** menu and run **Reset 
 
 Your `.onion` addresses are never affected, by either route.
 
-If Tor still can't connect after a reset, its health status will say so, and the problem is almost certainly your server's internet connection rather than Tor itself.
+If Tor still can't connect after a reset, its health status will say so, and the problem is almost certainly your server's internet connection, or your bridges if you use them, rather than Tor itself. If your network blocks Tor, connect through bridges instead.
 
 ### Choosing between staying reachable and staying hidden
 
@@ -64,6 +77,6 @@ Leave it on unless hiding this server's location matters more to you than stayin
 
 Tor's configuration file, `torrc`, has two parts. The top part is yours: options you add there are kept and Tor uses them. Everything below the marked line is written by StartOS and is replaced whenever your addresses change.
 
-### Relays and bridges
+### Running a relay or bridge
 
 Run a Tor relay or bridge separately from the server hosting your `.onion` addresses. A relay's IP address is public, and a server that both runs a relay and hosts `.onion` addresses can have the two linked. If you previously assigned custom domains to Tor's relay host, reattach them to a current service interface after updating; the update retires that host.
