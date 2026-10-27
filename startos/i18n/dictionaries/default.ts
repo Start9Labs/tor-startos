@@ -47,6 +47,19 @@ const dict = {
   'This onion address is no longer available': 43,
   'This onion address belongs to another service': 44,
   'Only an unused onion address can move to another host': 45,
+  'Connect via Bridges': 46,
+  'Reach the Tor network through bridges where it is blocked, or to hide from your internet provider that this server uses Tor': 47,
+  Bridges: 48,
+  'Paste your bridges one per line, exactly as bridges.torproject.org or Tor Browser gives them. obfs4, WebTunnel and Snowflake bridges work.': 49,
+  'Each line must be a whole bridge line that begins with obfs4, webtunnel or snowflake': 50,
+  'Paste at least one bridge line': 51,
+  'Tor cannot use this bridge line:': 52,
+  'Connecting via Bridges': 53,
+  'Tor reconnects through these bridges, which can take a few minutes. If its health check stays stuck, try other bridges.': 54,
+  'Stop Using Bridges': 55,
+  'Connect to the Tor network directly, without bridges': 56,
+  'Tor will forget your bridges and connect to the Tor network directly, which your internet provider can see. On a network that blocks Tor, it cannot connect, and neither can anything that depends on it.': 57,
+  'Tor reset its connection but still cannot connect through its bridges. Check the server’s internet connection, or try other bridges.': 58,
 } as const
 
 export type I18nKey = keyof typeof dict

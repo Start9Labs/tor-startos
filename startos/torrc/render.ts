@@ -5,6 +5,14 @@
  */
 const MARKER_PREFIX = '# ===== Everything below this line is generated'
 
+/** Each transport plugin in the image, with the transports it serves. */
+const PLUGINS = {
+  '/usr/bin/lyrebird': ['obfs4', 'webtunnel'],
+  '/usr/bin/snowflake-client': ['snowflake'],
+}
+
+export const TRANSPORTS = Object.values(PLUGINS).flat()
+
 /** An onion service whose forward targets are already resolved. */
 export type RenderedOnion = {
   /** Path of the HiddenServiceDir, relative to the torrc's directory. */
@@ -20,6 +28,7 @@ export type RenderInput = {
   /** Where the generated section comes from, named in the marker. */
   source: string
   socksPort: number
+  bridges: string[]
   onions: RenderedOnion[]
 }
 
@@ -64,6 +73,16 @@ export function render(user: string, input: RenderInput): string {
     `DataDirectory ${input.root}/data`,
     `ControlSocket ${input.root}/control.sock`,
   ]
+  if (input.bridges.length) {
+    const used = new Set(input.bridges.map((b) => b.split(' ')[0]))
+    out.push('', 'UseBridges 1')
+    for (const [plugin, transports] of Object.entries(PLUGINS)) {
+      const needed = transports.filter((t) => used.has(t))
+      if (needed.length)
+        out.push(`ClientTransportPlugin ${needed.join(',')} exec ${plugin}`)
+    }
+    out.push(...input.bridges.map((b) => `Bridge ${b}`))
+  }
   for (const onion of input.onions) {
     if (onion.ports.length === 0) continue
     out.push('', `# ${onion.label}`)

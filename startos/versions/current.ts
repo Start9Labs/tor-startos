@@ -1,18 +1,18 @@
 import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '0.4.9.14:1',
+  version: '0.4.9.14:2',
   releaseNotes: {
     en_US:
-      'Restarting Tor while it is still starting stops every process of the previous run.',
+      'Adds Connect via Bridges, which reaches the Tor network through obfs4, WebTunnel or Snowflake bridges on networks that block Tor.',
     es_ES:
-      'Reiniciar Tor mientras aún se está iniciando detiene todos los procesos de la ejecución anterior.',
+      'Añade Conectar mediante puentes, que accede a la red Tor a través de puentes obfs4, WebTunnel o Snowflake en redes que bloquean Tor.',
     de_DE:
-      'Ein Neustart von Tor, während es noch startet, beendet alle Prozesse des vorherigen Laufs.',
+      'Neue Aktion „Über Brücken verbinden“: Tor erreicht das Tor-Netzwerk damit über obfs4-, WebTunnel- oder Snowflake-Brücken, auch wo Tor blockiert ist.',
     pl_PL:
-      'Ponowne uruchomienie Tor w trakcie uruchamiania zatrzymuje wszystkie procesy poprzedniego uruchomienia.',
+      'Dodaje akcję Połącz przez mostki, która łączy z siecią Tor przez mostki obfs4, WebTunnel lub Snowflake w sieciach blokujących Tora.',
     fr_FR:
-      "Redémarrer Tor pendant son démarrage arrête tous les processus de l'exécution précédente.",
+      "Ajoute l'action Se connecter via des ponts, qui rejoint le réseau Tor via des ponts obfs4, WebTunnel ou Snowflake sur les réseaux qui bloquent Tor.",
   },
   migrations: {
     up: async () => {},

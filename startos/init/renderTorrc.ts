@@ -20,6 +20,7 @@ import { watchOnionTarget } from '../utils/onions'
  */
 export const renderTorrc = sdk.setupOnInit(async (effects) => {
   const onions = present(await storeJson.read((s) => s.onions).const(effects))
+  const bridges = await storeJson.read((s) => s.bridges).const(effects)
 
   const rendered: RenderedOnion[] = []
   for (const [id, onion] of Object.entries(onions)) {
@@ -46,6 +47,7 @@ export const renderTorrc = sdk.setupOnInit(async (effects) => {
     root: '/var/lib/tor',
     source: STORE_LOCATION,
     socksPort,
+    bridges: bridges ?? [],
     onions: rendered,
   })
   if (next !== current) await torrcFile.write(effects, next)

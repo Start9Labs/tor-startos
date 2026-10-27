@@ -137,7 +137,7 @@ Si vous faisiez tourner un relais, il s'arrête avec cette mise à jour. L'inter
         }
         const store = await storeJson.read().once()
         await storeJson.write(effects, {
-          ...(store ?? { automaticRecovery: true }),
+          ...(store ?? { automaticRecovery: true, bridges: [] }),
           onions,
         })
         await rename(

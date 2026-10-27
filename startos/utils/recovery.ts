@@ -29,6 +29,9 @@ export const autoWiped = flag('.auto-wiped')
 /** Tor must be unhealthy this long before the watchdog does anything at all. */
 const STALL_MS = 5 * 60_000
 
+/** One bootstrap phase through bridges can take most of five minutes. */
+const BRIDGED_STALL_MS = 3 * STALL_MS
+
 /**
  * Waits after each attempt at dropping entry nodes. The length is also the
  * number of attempts, after which the watchdog escalates to a wipe.
@@ -87,7 +90,8 @@ export function requestWipe() {
  * isn't stale state — most likely the box has no working internet — so the
  * watchdog stops and leaves the health check reporting the failure.
  */
-export function watchdog(effects: T.Effects, wiped: boolean) {
+export function watchdog(effects: T.Effects, wiped: boolean, bridged: boolean) {
+  const stallMs = bridged ? BRIDGED_STALL_MS : STALL_MS
   let unhealthySince: number | null = null
   let lastProgress: number | null = null
   let attempts = 0
@@ -126,7 +130,7 @@ export function watchdog(effects: T.Effects, wiped: boolean) {
       (progress !== null && progress !== lastProgress)
     ) {
       unhealthySince = now
-      nextAttemptAt = now + STALL_MS
+      nextAttemptAt = now + stallMs
     }
     lastProgress = progress
 
@@ -151,7 +155,7 @@ export function watchdog(effects: T.Effects, wiped: boolean) {
         wiped = true
         // Holds off while the service tears down, and retries if the restart
         // never lands.
-        nextAttemptAt = now + STALL_MS
+        nextAttemptAt = now + stallMs
         // Request first: a crash between the two costs one extra wipe, not a
         // skipped one.
         await wipeRequested.set()
@@ -172,9 +176,13 @@ export function watchdog(effects: T.Effects, wiped: boolean) {
     if (exhausted)
       return {
         result: 'failure',
-        message: i18n(
-          'Tor reset its connection but still cannot connect. Check the server’s internet connection.',
-        ),
+        message: bridged
+          ? i18n(
+              'Tor reset its connection but still cannot connect through its bridges. Check the server’s internet connection, or try other bridges.',
+            )
+          : i18n(
+              'Tor reset its connection but still cannot connect. Check the server’s internet connection.',
+            ),
       }
     if (!bootstrap)
       return { result: 'failure', message: i18n('Tor is not ready') }
