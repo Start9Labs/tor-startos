@@ -32,7 +32,10 @@ export const renderTorrc = sdk.setupOnInit(async (effects) => {
         return null
       })
       if (target !== null)
-        ports.push({ externalPort: port.externalPort, target })
+        ports.push({
+          externalPort: port.externalPort,
+          target: target.address,
+        })
     }
     rendered.push({
       dir: hsDir(id, onion),

@@ -61,6 +61,10 @@ export default {
     56: 'Se conecta a la red Tor directamente, sin puentes',
     57: 'Tor olvidará sus puentes y se conectará directamente a la red Tor, algo que su proveedor de internet puede ver. En una red que bloquea Tor, no podrá conectarse, ni tampoco nada de lo que depende de él.',
     58: 'Tor restableció su conexión pero sigue sin poder conectarse a través de sus puentes. Compruebe la conexión a internet del servidor o pruebe con otros puentes.',
+    59: 'Direcciones .onion sin usar',
+    60: 'Algunas direcciones .onion de este servidor no están asociadas a ninguna interfaz, por lo que Tor no las publica.',
+    61: 'Tor guarda las claves de estas direcciones, pero ninguna interfaz las usa:',
+    62: 'Entre ellas puede haber direcciones traídas de StartOS 0.3.5. Para volver a publicar una, abra la interfaz en la que la quiere, agregue una dirección .onion y elija la dirección existente de la lista en lugar de crear una nueva. **Eliminar direcciones onion sin usar**, en las acciones de Tor, elimina definitivamente las que ya no necesite.',
   },
   de_DE: {
     0: 'Tor läuft',
@@ -122,6 +126,10 @@ export default {
     56: 'Verbindet direkt mit dem Tor-Netzwerk, ohne Brücken',
     57: 'Tor vergisst Ihre Brücken und verbindet sich direkt mit dem Tor-Netzwerk, was Ihr Internetanbieter sehen kann. In einem Netzwerk, das Tor blockiert, kann es keine Verbindung herstellen, und alles, was davon abhängt, ebenfalls nicht.',
     58: 'Tor hat seine Verbindung zurückgesetzt, kann sich aber weiterhin nicht über seine Brücken verbinden. Prüfen Sie die Internetverbindung des Servers oder versuchen Sie andere Brücken.',
+    59: 'Ungenutzte .onion-Adressen',
+    60: 'Einige .onion-Adressen auf diesem Server sind keiner Schnittstelle zugeordnet, daher veröffentlicht Tor sie nicht.',
+    61: 'Tor verwahrt die Schlüssel dieser Adressen, aber keine Schnittstelle nutzt sie:',
+    62: 'Darunter können Adressen sein, die aus StartOS 0.3.5 übernommen wurden. Um eine wieder zu veröffentlichen, öffnen Sie die Schnittstelle, an der Sie sie haben möchten, fügen eine .onion-Adresse hinzu und wählen die vorhandene Adresse aus der Liste, statt eine neue zu erstellen. **Ungenutzte Onion-Adressen löschen** in den Aktionen von Tor löscht die nicht mehr benötigten endgültig.',
   },
   pl_PL: {
     0: 'Tor działa',
@@ -183,6 +191,10 @@ export default {
     56: 'Łączy z siecią Tor bezpośrednio, bez mostków',
     57: 'Tor zapomni Twoje mostki i połączy się z siecią Tor bezpośrednio, co Twój dostawca internetu może zobaczyć. W sieci, która blokuje Tora, nie zdoła się połączyć, podobnie jak wszystko, co od niego zależy.',
     58: 'Tor zresetował połączenie, ale nadal nie może się połączyć przez swoje mostki. Sprawdź połączenie internetowe serwera lub spróbuj innych mostków.',
+    59: 'Nieużywane adresy .onion',
+    60: 'Niektóre adresy .onion na tym serwerze nie są przypisane do żadnego interfejsu, więc Tor ich nie publikuje.',
+    61: 'Tor przechowuje klucze tych adresów, ale żaden interfejs ich nie używa:',
+    62: 'Mogą być wśród nich adresy przeniesione ze StartOS 0.3.5. Aby ponownie opublikować adres, otwórz interfejs, na którym ma działać, dodaj adres .onion i wybierz istniejący adres z listy zamiast tworzyć nowy. Akcja **Usuń nieużywane adresy onion** w akcjach Tora trwale usuwa te, których już nie potrzebujesz.',
   },
   fr_FR: {
     0: 'Tor fonctionne',
@@ -244,5 +256,9 @@ export default {
     56: 'Se connecte directement au réseau Tor, sans ponts',
     57: "Tor oubliera vos ponts et se connectera directement au réseau Tor, ce que votre fournisseur d'accès peut voir. Sur un réseau qui bloque Tor, il ne pourra pas se connecter, pas plus que tout ce qui en dépend.",
     58: "Tor a réinitialisé sa connexion mais ne parvient toujours pas à se connecter via ses ponts. Vérifiez la connexion internet du serveur, ou essayez d'autres ponts.",
+    59: 'Adresses .onion inutilisées',
+    60: 'Certaines adresses .onion de ce serveur ne sont rattachées à aucune interface : Tor ne les publie donc pas.',
+    61: 'Tor conserve les clés de ces adresses, mais aucune interface ne les utilise :',
+    62: "Des adresses reprises de StartOS 0.3.5 peuvent en faire partie. Pour en publier une à nouveau, ouvrez l'interface où vous la voulez, ajoutez une adresse .onion et choisissez l'adresse existante dans la liste au lieu d'en créer une nouvelle. **Supprimer les adresses onion inutilisées**, dans les actions de Tor, supprime définitivement celles dont vous n'avez plus besoin.",
   },
 } satisfies Record<string, LangDict>

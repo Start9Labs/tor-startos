@@ -128,7 +128,9 @@ Nothing to configure. Install seeds `store.json` and renders a `torrc`. Start th
 
 **You do not add onion services by hand.** They arrive through the URL plugin when a service is given a Tor address on its interface page.
 
-**An install carrying onion addresses from StartOS 0.3.5 imports them once.** If `onion-migration.json` is present on the `startos` volume, init derives each address from its key, writes the key material into place, and renames the file. Keys that are not properly clamped are skipped. Valid keys are kept even when their package or host is absent, with an empty port list; retrying an interrupted import recognizes already imported addresses.
+**An install carrying onion addresses from StartOS 0.3.5 imports them once.** If `onion-migration.json` is present on the `startos` volume, init derives each address from its key, writes the key material into place, and renames the file to `.onion-migration.json.bak`. Each address keeps the ports StartOS hands over with it — the onion port and internal port of every mapping it had on 0.3.5, using the binding's native protocol (including native TLS), not an OS-added SSL leg — so it is served as soon as its service binds those ports, in whatever order the services migrate. An entry handed over without ports takes them from its host's bindings at import, disabled ones included, and gets an empty port list if the host is absent. Keys that are not properly clamped are skipped; retrying an interrupted import recognizes already imported addresses.
+
+**An import that leaves an address with no ports, and the update to 0.4.9.15:0 on a server that imported addresses, post a notification** listing every unused address with its package and host, and how to attach one again.
 
 **Updating from a release that used `torrc` as its database** runs a migration that reads the onions out of the old `torrc` into `store.json`, sets that file aside as `torrc.legacy`, and moves Tor's state and caches under `data/` so the update does not re-select the server's entry nodes. Relay settings are dropped and the old relay host is retired, freeing its bindings. The downgrade is prohibited.
 

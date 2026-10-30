@@ -49,7 +49,7 @@ export const deleteOnionService = sdk.Action.withInput(
 
   // execution
   async ({ effects, input, caller }) => {
-    const { packageId, hostId, hostname, port, ssl } = input.urlPluginMetadata
+    const { packageId, hostId, hostname, port } = input.urlPluginMetadata
     requireOwner(caller, packageId)
 
     const onions = present(await storeJson.read((s) => s.onions).once())
@@ -62,9 +62,7 @@ export const deleteOnionService = sdk.Action.withInput(
       // Detach only. The key stays until the user deletes it.
       onions[id] = {
         ...onion,
-        ports: onion.ports.filter(
-          (p) => !(p.externalPort === port && p.ssl === ssl),
-        ),
+        ports: onion.ports.filter((p) => p.externalPort !== port),
       }
       break
     }

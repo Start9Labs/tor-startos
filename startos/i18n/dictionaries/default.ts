@@ -60,6 +60,10 @@ const dict = {
   'Connect to the Tor network directly, without bridges': 56,
   'Tor will forget your bridges and connect to the Tor network directly, which your internet provider can see. On a network that blocks Tor, it cannot connect, and neither can anything that depends on it.': 57,
   'Tor reset its connection but still cannot connect through its bridges. Check the server’s internet connection, or try other bridges.': 58,
+  'Unused .onion addresses': 59,
+  'Some .onion addresses on this server are attached to no interface, so Tor is not publishing them.': 60,
+  'Tor holds the keys of these addresses, but no interface uses them:': 61,
+  'Addresses carried over from StartOS 0.3.5 can be among them. To publish one again, open the interface you want it on, add a .onion address, and pick the existing address from the list instead of creating a new one. **Delete Unused Onion Addresses**, in Tor’s Actions, permanently deletes the ones you no longer need.': 62,
 } as const
 
 export type I18nKey = keyof typeof dict
