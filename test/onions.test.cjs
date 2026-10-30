@@ -24,7 +24,7 @@ const watch = (read) => ({
   once: async () => read(),
   const: async () => read(),
 })
-let hosts, addresses, contents, torrc, exported, lookupFails
+let hosts, addresses, contents, torrc, exported, notified, lookupFails
 const root = require('node:fs').mkdtempSync(
   path.join(os.tmpdir(), 'tor-onions-'),
 )
@@ -33,6 +33,7 @@ sdk.volumes.startos.path = path.join(root, 'startos')
 sdk.setupOnInit = (fn) => fn
 sdk.plugin.url.setupExportedUrls = (fn) => fn
 sdk.plugin.url.exportUrl = async (_effects, value) => exported.push(value)
+sdk.notification.create = async (_effects, value) => notified.push(value)
 sdk.host.get = (_effects, { packageId, hostId }, project = (host) => host) =>
   watch(() => {
     if (lookupFails) throw new Error('Host lookup failed')
@@ -69,6 +70,7 @@ const {
 const {
   migrateOnionAddresses,
 } = require('../startos/init/migrateOnionAddresses.ts')
+const { current } = require('../startos/versions/current.ts')
 const { generateOnionFiles, isClamped } = require('../startos/utils/index.ts')
 const { isServed, onionHostname } = require('../startos/utils/onions.ts')
 const effects = { eventId: 'onion-test', isInContext: true }
@@ -121,6 +123,7 @@ beforeEach(async () => {
   contents = { automaticRecovery: true, onions: {} }
   torrc = ''
   exported = []
+  notified = []
   lookupFails = false
 })
 afterEach(async () => fs.rm(root, { recursive: true, force: true }))
@@ -290,4 +293,151 @@ test('an interrupted legacy import preserves absent-host keys and retries withou
   await migrateOnionAddresses(effects)
   assert.deepEqual(Object.keys(contents.onions), [id])
   assert.equal(await onionHostname(id), files.hostname)
+})
+
+async function handOff(...entries) {
+  await sdk.volumes.startos.writeFile(
+    'onion-migration.json',
+    JSON.stringify({ addresses: entries }),
+  )
+}
+function legacyAddress(packageId, hostId, ports) {
+  const files = generateOnionFiles()
+  return {
+    files,
+    entry: {
+      packageId,
+      hostId,
+      hostname: files.hostname,
+      key: files.secretKey.subarray(32).toString('base64'),
+      ...(ports && { ports }),
+    },
+  }
+}
+
+test('a handed-over address keeps its 0.3.5 ports without reading its host', async () => {
+  const { files, entry } = legacyAddress('lnd', 'peer', [
+    { externalPort: 9735, internalPort: 9735 },
+  ])
+  await handOff(entry)
+  lookupFails = true
+  await migrateOnionAddresses(effects)
+  const id = 'lnd/peer/0'
+  assert.deepEqual(contents.onions[id].ports, [
+    {
+      externalPort: 9735,
+      internalPort: 9735,
+      ssl: false,
+      nativeProtocol: true,
+    },
+  ])
+  assert.equal(notified.length, 0)
+
+  lookupFails = false
+  await renderTorrc(effects)
+  assert.equal(torrc.includes('HiddenServicePort 9735'), false)
+  hosts['lnd/peer'] = { bindings: { 9735: binding() } }
+  addresses['lnd/peer/9735/false'] = '10.0.3.1:50001'
+  await renderTorrc(effects)
+  assert.ok(torrc.includes('HiddenServicePort 9735 10.0.3.1:50001'))
+  assert.equal(await onionHostname(id), files.hostname)
+})
+
+test('a handed-over native-TLS port resolves and exports its TLS leg', async () => {
+  const { files, entry } = legacyAddress('lnd', 'control', [
+    { externalPort: 8080, internalPort: 8080 },
+  ])
+  await handOff(entry)
+  lookupFails = true
+  await migrateOnionAddresses(effects)
+  lookupFails = false
+  const id = 'lnd/control/0'
+  await renderTorrc(effects)
+  assert.equal(torrc.includes('HiddenServicePort 8080'), false)
+
+  hosts['lnd/control'] = {
+    bindings: {
+      8080: {
+        ...binding(),
+        options: {
+          preferredExternalPort: 8080,
+          secure: { ssl: true },
+          addSsl: null,
+        },
+      },
+    },
+  }
+  addresses['lnd/control/8080/true'] = '10.0.3.1:50002'
+  await renderTorrc(effects)
+  await exportUrls({ effects })
+  assert.ok(torrc.includes('HiddenServicePort 8080 10.0.3.1:50002'))
+  assert.equal(exported.length, 1)
+  assert.equal(exported[0].hostnameInfo.ssl, true)
+  assert.equal(await isServed(effects, id, contents.onions[id]), true)
+
+  await assert.rejects(
+    run(addOnionService, {
+      ...input(id, 'control', 'lnd'),
+      urlPluginMetadata: {
+        ...metadata('control', 'lnd'),
+        internalPort: 8080,
+      },
+    }),
+    /expected \\"new\\"/,
+  )
+  await run(deleteOnionService, {
+    urlPluginMetadata: {
+      ...exported[0].hostnameInfo,
+      interfaceId: 'control',
+    },
+  })
+  assert.deepEqual(contents.onions[id].ports, [])
+  assert.equal(await onionHostname(id), files.hostname)
+})
+
+test('a handed-over plain port never selects OS-added TLS', async () => {
+  const { entry } = legacyAddress('bitcoind', 'peer', [
+    { externalPort: 8333, internalPort: 58333 },
+  ])
+  await handOff(entry)
+  await migrateOnionAddresses(effects)
+  hosts['bitcoind/peer'].bindings[58333].options.addSsl = {
+    preferredExternalPort: 443,
+  }
+  addresses['bitcoind/peer/58333/true'] = '10.0.3.1:50003'
+  await renderTorrc(effects)
+  await exportUrls({ effects })
+  assert.ok(torrc.includes('HiddenServicePort 8333 10.0.3.1:50000'))
+  assert.equal(exported[0].hostnameInfo.ssl, false)
+})
+
+test('ports derived at import include a disabled binding', async () => {
+  await handOff(legacyAddress('bitcoind', 'peer').entry)
+  hosts['bitcoind/peer'].bindings[58333].enabled = false
+  await migrateOnionAddresses(effects)
+  assert.deepEqual(contents.onions['bitcoind/peer/0'].ports, [port])
+  assert.equal(notified.length, 0)
+})
+
+test('an import that leaves an address unattached reports the unused addresses', async () => {
+  const { files, entry } = legacyAddress('lnd', 'peer')
+  await handOff(entry)
+  await migrateOnionAddresses(effects)
+  assert.deepEqual(contents.onions['lnd/peer/0'].ports, [])
+  assert.equal(notified.length, 1)
+  assert.equal(notified[0].level, 'warning')
+  assert.ok(notified[0].data.includes(`\`${files.hostname}\` — lnd/peer`))
+})
+
+test('the update reports unused addresses only on a server that imported from 0.3.5', async () => {
+  const files = await seed('lnd/peer/0', [])
+  await seed('bitcoind/peer/0')
+  await current.options.migrations.up({ effects })
+  assert.equal(notified.length, 0)
+
+  await sdk.volumes.startos.writeFile('.onion-migration.json.bak', '{}')
+  await current.options.migrations.up({ effects })
+  assert.equal(notified.length, 1)
+  assert.ok(notified[0].data.includes(`\`${files.hostname}\` — lnd/peer`))
+  assert.equal(notified[0].data.includes('bitcoind/peer'), false)
 })

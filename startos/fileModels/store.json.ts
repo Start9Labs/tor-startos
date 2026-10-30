@@ -8,6 +8,8 @@ const portShape = z.looseObject({
   /** The binding it forwards to. The forward target itself is never stored. */
   internalPort: z.number(),
   ssl: z.boolean(),
+  /** Follows the container's protocol, not OS-added TLS. */
+  nativeProtocol: z.literal(true).optional(),
 })
 
 const onionShape = z.looseObject({

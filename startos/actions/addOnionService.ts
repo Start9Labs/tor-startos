@@ -10,7 +10,12 @@ import {
 import { i18n } from '../i18n'
 import { sdk } from '../sdk'
 import { generateOnionFiles } from '../utils'
-import { isServed, onionHostname, requireOwner } from '../utils/onions'
+import {
+  isServed,
+  onionHostname,
+  onionPortSsl,
+  requireOwner,
+} from '../utils/onions'
 
 const { InputSpec, Value, Variants } = sdk
 
@@ -115,8 +120,8 @@ const inputSpec = InputSpec.of({
         const served = onion.ports.filter(
           (p) => p.internalPort === internalPort,
         )
-        const hasNonSsl = served.some((p) => !p.ssl)
-        const hasSsl = served.some((p) => p.ssl)
+        const hasNonSsl = served.some((p) => !onionPortSsl(p, binding))
+        const hasSsl = served.some((p) => onionPortSsl(p, binding))
 
         // An address in use stays on its host.
         if (inUse) {
@@ -243,7 +248,8 @@ export const addOnionService = sdk.Action.withInput(
       if (
         !moving &&
         existing.ports.some(
-          (p) => p.ssl === ssl && p.internalPort === internalPort,
+          (p) =>
+            onionPortSsl(p, binding) === ssl && p.internalPort === internalPort,
         )
       ) {
         throw new Error(

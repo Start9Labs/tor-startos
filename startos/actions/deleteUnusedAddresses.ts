@@ -1,27 +1,10 @@
 import { rm } from 'fs/promises'
-import { T } from '@start9labs/start-sdk'
-import {
-  hsDir,
-  parseOnionId,
-  present,
-  storeJson,
-  writeOnions,
-} from '../fileModels/store.json'
+import { hsDir, parseOnionId, writeOnions } from '../fileModels/store.json'
 import { i18n } from '../i18n'
 import { sdk } from '../sdk'
-import { isServed, onionHostname } from '../utils/onions'
+import { onionHostname, unusedAddresses } from '../utils/onions'
 
 const { InputSpec, Value } = sdk
-
-/** The addresses no interface is using: no port of theirs resolves. */
-async function unusedAddresses(effects: T.Effects) {
-  const onions = present(await storeJson.read((s) => s.onions).once())
-  const unused: string[] = []
-  for (const [id, onion] of Object.entries(onions)) {
-    if (!(await isServed(effects, id, onion))) unused.push(id)
-  }
-  return { onions, unused }
-}
 
 const inputSpec = InputSpec.of({
   addresses: Value.dynamicMultiselect(async ({ effects }) => {
