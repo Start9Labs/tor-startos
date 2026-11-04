@@ -44,6 +44,4 @@ The base-image pin lives in `Dockerfile` (`FROM alpine:<tag>`). Move it when the
 ## Applying the bump
 
 1. Verify Alpine publishes the desired Tor package for every supported architecture.
-2. Update `torVersion` in `startos/manifest/index.ts`, the version (upstream component and downstream revision) and release notes in `startos/versions/current.ts`, and the Alpine packaging revision in the Dockerfile if needed.
-3. Build the packages. The explicit package selector and build argument make a version change invalidate the cached Tor-install layer.
-4. Verify the binary with `start-cli package attach tor -n tor-sub -- tor --version`, as well as the package manifest version.
+2. Update `torVersion` in `startos/manifest/index.ts`, the upstream component of `version` in `startos/versions/current.ts`, and the Alpine packaging revision in the Dockerfile if needed.
