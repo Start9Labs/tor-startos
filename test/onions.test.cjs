@@ -70,7 +70,7 @@ const {
 const {
   migrateOnionAddresses,
 } = require('../startos/init/migrateOnionAddresses.ts')
-const { current } = require('../startos/versions/current.ts')
+const { v_0_4_9_15_0 } = require('../startos/versions/v0.4.9.15_0.ts')
 const { generateOnionFiles, isClamped } = require('../startos/utils/index.ts')
 const { isServed, onionHostname } = require('../startos/utils/onions.ts')
 const effects = { eventId: 'onion-test', isInContext: true }
@@ -432,11 +432,11 @@ test('an import that leaves an address unattached reports the unused addresses',
 test('the update reports unused addresses only on a server that imported from 0.3.5', async () => {
   const files = await seed('lnd/peer/0', [])
   await seed('bitcoind/peer/0')
-  await current.options.migrations.up({ effects })
+  await v_0_4_9_15_0.options.migrations.up({ effects })
   assert.equal(notified.length, 0)
 
   await sdk.volumes.startos.writeFile('.onion-migration.json.bak', '{}')
-  await current.options.migrations.up({ effects })
+  await v_0_4_9_15_0.options.migrations.up({ effects })
   assert.equal(notified.length, 1)
   assert.ok(notified[0].data.includes(`\`${files.hostname}\` — lnd/peer`))
   assert.equal(notified[0].data.includes('bitcoind/peer'), false)
