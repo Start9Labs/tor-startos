@@ -59,7 +59,6 @@ export const main = sdk.setupMain(async ({ effects }) => {
           // until it reports success (then back off to the 30s default).
           trigger: sdk.trigger.statusTrigger(30_000, {
             starting: 1_000,
-            waiting: 1_000,
             failure: 1_000,
             loading: 1_000,
           }),
