@@ -35,7 +35,7 @@
 
 ## Image and Container Runtime
 
-A minimal Alpine build around the distribution's `tor` package — no upstream image exists to use. The manifest's `torVersion` supplies an exact APK version to the Docker build; `startos/versions/current.ts` repeats it as the package version's upstream component. The image also carries Alpine's `lyrebird` (obfs4 and WebTunnel) and `snowflake-client` (Snowflake), unpinned: the transport plugins Tor runs as its own child processes while it connects through bridges.
+A minimal Alpine build around the distribution's `tor` package — no upstream image exists to use. The manifest's `torVersion` supplies an exact APK version to the Docker build; `startos/versions/current.ts` repeats it as the package version's upstream component. The image also carries `lyrebird` (obfs4 and WebTunnel) and `snowflake-client` (Snowflake), built from pinned upstream releases with a current Go toolchain in a separate Dockerfile stage: the transport plugins Tor runs as its own child processes while it connects through bridges.
 
 | Property      | Value                                   |
 | ------------- | --------------------------------------- |
@@ -140,7 +140,7 @@ Nothing to configure. Install seeds `store.json` and renders a `torrc`. Start th
 
 The plugin's table actions — StartOS invokes them from an interface page.
 
-- **Add** attaches an address to the interface's binding: a new one, optionally from a supplied key, or an existing address of the same package. An address in use stays on its host; an entirely unused one can be explicitly moved to another host within that package, retaining its hostname and original key directory. Attaching to an existing address sheds any mapping of its whose binding is gone.
+- **Add** attaches an address to the interface's binding: a new one, optionally from a supplied key (a base64 64-byte expanded ed25519 key with a clamped scalar; anything else is refused before a file is written), or an existing address of the same package. An address in use stays on its host; an entirely unused one can be explicitly moved to another host within that package, retaining its hostname and original key directory. Attaching to an existing address sheds any mapping of its whose binding is gone.
 - **Delete** detaches: it removes that port's mapping and nothing else. The key stays, and an address left with no port becomes unused.
 - **Services call them too.** Both are `access: 'public'`, so any installed service can run them through `effects.action.run` to manage its own addresses — for instance, to move an address back onto a port it renumbered. Each checks the action's `caller` against `urlPluginMetadata.packageId` and refuses a service acting on another's host; the user, whose `caller` is `null`, may act on any. Add runs the check in its input form too, so a service cannot list another's unused addresses either. The input is the one the interface page sends: `urlPluginMetadata` names the package, host, interface and internal port, and `address.selection` is `new` or one of the address ids the form offers.
 
@@ -239,7 +239,7 @@ Both volumes are backed up — `sdk.Backups.ofVolumes('tor', 'startos')`. The st
 
 ```yaml
 package_id: tor
-image: ./Dockerfile # FROM alpine, apk add tor lyrebird snowflake-client
+image: ./Dockerfile # FROM alpine, apk add tor; lyrebird and snowflake-client built from source
 architectures:
   - x86_64
   - aarch64

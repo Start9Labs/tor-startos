@@ -57,7 +57,7 @@ export const migrateOnionAddresses = sdk.setupOnInit(async (effects) => {
     // Skip keys that aren't properly clamped
     if (!key) continue
     const keyBytes = Buffer.from(key, 'base64')
-    if (keyBytes.length < 64 || !isClamped(keyBytes.subarray(0, 32))) continue
+    if (keyBytes.length !== 64 || !isClamped(keyBytes.subarray(0, 32))) continue
 
     const { secretKey, hostname } = generateOnionFiles(key)
     const existing = await Promise.all(

@@ -51,7 +51,14 @@ export function generateOnionFiles(privateKeyBase64?: string | null): {
   if (privateKeyBase64) {
     // User-provided key: 64-byte expanded key (no header)
     const expanded = Buffer.from(privateKeyBase64, 'base64')
+    // Tor discards a key file of the wrong length and generates a new address.
+    if (expanded.length !== 64) {
+      throw new Error('Invalid key: must decode to a 64-byte expanded key')
+    }
     const scalar = expanded.subarray(0, 32)
+    if (!isClamped(scalar)) {
+      throw new Error('Invalid key: scalar is not clamped')
+    }
     // Reduce scalar mod curve order before multiplying, matching what
     // @noble/curves does internally in getExtendedPublicKey(). Clamped
     // ed25519 scalars have bit 254 set (~2^254) which exceeds the curve

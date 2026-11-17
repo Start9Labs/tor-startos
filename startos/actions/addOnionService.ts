@@ -30,8 +30,8 @@ const privateKeySpec = InputSpec.of({
     placeholder: null,
     patterns: [
       {
-        regex: '^[A-Za-z0-9+/]+=*$',
-        description: 'Must be a valid base64 string',
+        regex: '^[A-Za-z0-9+/]{86}==$',
+        description: 'Must be a base64-encoded 64-byte key',
       },
     ],
     masked: true,
