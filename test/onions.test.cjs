@@ -72,6 +72,7 @@ const {
 } = require('../startos/init/migrateOnionAddresses.ts')
 const { v_0_4_9_15_0 } = require('../startos/versions/v0.4.9.15_0.ts')
 const { generateOnionFiles, isClamped } = require('../startos/utils/index.ts')
+const { ed25519 } = require('@noble/curves/ed25519.js')
 const { isServed, onionHostname } = require('../startos/utils/onions.ts')
 const effects = { eventId: 'onion-test', isInContext: true }
 const port = { externalPort: 8333, internalPort: 58333, ssl: false }
@@ -440,4 +441,26 @@ test('the update reports unused addresses only on a server that imported from 0.
   assert.equal(notified.length, 1)
   assert.ok(notified[0].data.includes(`\`${files.hostname}\` — lnd/peer`))
   assert.equal(notified[0].data.includes('bitcoind/peer'), false)
+})
+
+test('a supplied key must be a clamped 64-byte expanded key', () => {
+  const { head, prefix } = ed25519.utils.getExtendedPublicKey(
+    ed25519.utils.randomSecretKey(),
+  )
+  const key = Buffer.concat([head, prefix])
+  const files = generateOnionFiles(key.toString('base64'))
+  assert.equal(files.secretKey.length, 96)
+  assert.match(files.hostname, /^[a-z2-7]{56}\.onion$/)
+
+  assert.throws(() => generateOnionFiles('A'.repeat(87) + 'B'), /64-byte/)
+  assert.throws(
+    () => generateOnionFiles(Buffer.concat([key, key]).toString('base64')),
+    /64-byte/,
+  )
+  const unclamped = Buffer.from(key)
+  unclamped[0] |= 1
+  assert.throws(
+    () => generateOnionFiles(unclamped.toString('base64')),
+    /not clamped/,
+  )
 })
