@@ -1,8 +1,8 @@
 FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine3.23 AS transports
 ARG LYREBIRD_VERSION=0.10.0
 ARG LYREBIRD_COMMIT=59ac7e400c384773f5584dbe366516ad04a33d9f
-ARG SNOWFLAKE_VERSION=v2.15.3
-ARG SNOWFLAKE_COMMIT=3bd77dc0f574255d072f70a840e18c0af3d43866
+ARG SNOWFLAKE_VERSION=v2.15.4
+ARG SNOWFLAKE_COMMIT=1c644981fb5628880eb7d66baa8099a02aad4052
 RUN apk add --no-cache git
 WORKDIR /src
 RUN git clone --depth 1 --branch "$LYREBIRD_VERSION" https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/lyrebird.git \
