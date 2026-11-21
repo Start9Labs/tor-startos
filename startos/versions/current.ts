@@ -1,18 +1,18 @@
 import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '0.4.9.17:1',
+  version: '0.4.9.17:2',
   releaseNotes: {
     en_US:
-      'Requires StartOS 0.4.2 or later. The obfs4, WebTunnel and Snowflake bridge transports are rebuilt with a current Go release, which rejects certificates from the compromised eMudhra intermediate CAs. Add Onion Service now refuses a private key that is not a valid 64-byte expanded ed25519 key.',
+      'Updated the Snowflake bridge transport to 2.15.4. It fixes security flaws that let a crafted response crash Snowflake or exhaust its memory while connecting through a Snowflake bridge. Full notes: https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/snowflake/-/blob/v2.15.4/ChangeLog',
     es_ES:
-      'Requiere StartOS 0.4.2 o posterior. Los transportes de puente obfs4, WebTunnel y Snowflake se recompilan con una versión actual de Go, que rechaza los certificados de las CA intermedias comprometidas de eMudhra. Agregar servicio onion ahora rechaza una clave privada que no sea una clave ed25519 expandida válida de 64 bytes.',
+      'Se actualizó el transporte de puente Snowflake a 2.15.4. Corrige fallos de seguridad que permitían que una respuesta manipulada bloqueara Snowflake o agotara su memoria al conectarse a través de un puente Snowflake. Notas completas: https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/snowflake/-/blob/v2.15.4/ChangeLog',
     de_DE:
-      'Erfordert StartOS 0.4.2 oder neuer. Die Bridge-Transporte obfs4, WebTunnel und Snowflake werden mit einer aktuellen Go-Version neu gebaut, die Zertifikate der kompromittierten eMudhra-Zwischenzertifizierungsstellen ablehnt. Onion-Dienst hinzufügen weist jetzt einen privaten Schlüssel zurück, der kein gültiger 64-Byte-erweiterter ed25519-Schlüssel ist.',
+      'Der Snowflake-Bridge-Transport wurde auf 2.15.4 aktualisiert. Er behebt Sicherheitslücken, durch die eine manipulierte Antwort Snowflake beim Verbinden über eine Snowflake-Brücke zum Absturz bringen oder seinen Speicher erschöpfen konnte. Vollständige Hinweise: https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/snowflake/-/blob/v2.15.4/ChangeLog',
     pl_PL:
-      'Wymaga StartOS 0.4.2 lub nowszego. Transporty mostków obfs4, WebTunnel i Snowflake są zbudowane ponownie z aktualną wersją Go, która odrzuca certyfikaty przejętych pośrednich urzędów certyfikacji eMudhra. Dodaj usługę onion odrzuca teraz klucz prywatny, który nie jest prawidłowym 64-bajtowym rozszerzonym kluczem ed25519.',
+      'Zaktualizowano transport mostków Snowflake do wersji 2.15.4. Usuwa luki bezpieczeństwa, przez które spreparowana odpowiedź mogła spowodować awarię Snowflake lub wyczerpać jego pamięć podczas łączenia przez mostek Snowflake. Pełne informacje: https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/snowflake/-/blob/v2.15.4/ChangeLog',
     fr_FR:
-      "Nécessite StartOS 0.4.2 ou une version ultérieure. Les transports de pont obfs4, WebTunnel et Snowflake sont recompilés avec une version actuelle de Go, qui rejette les certificats des autorités intermédiaires eMudhra compromises. Ajouter un service onion refuse désormais une clé privée qui n'est pas une clé ed25519 étendue valide de 64 octets.",
+      "Le transport de pont Snowflake a été mis à jour vers la version 2.15.4. Elle corrige des failles de sécurité qui permettaient à une réponse malveillante de faire planter Snowflake ou d'épuiser sa mémoire lors d'une connexion via un pont Snowflake. Notes complètes : https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/snowflake/-/blob/v2.15.4/ChangeLog",
   },
   migrations: {
     up: async () => {},
