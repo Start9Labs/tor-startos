@@ -6,6 +6,7 @@ import {
   parseOnionId,
   present,
   storeJson,
+  targetId,
 } from '../fileModels/store.json'
 import { i18n } from '../i18n'
 import { sdk } from '../sdk'
@@ -61,20 +62,30 @@ const bindingState = (
     },
   )
 
+/**
+ * The bridge address an onion port forwards to: the target its service set with
+ * Set Onion Target, or the binding itself. A target that is unbound, disabled or
+ * exports an interface is not served.
+ */
 export async function watchOnionTarget(
   effects: T.Effects,
   id: string,
   port: OnionPort,
 ) {
   const { packageId, hostId } = parseOnionId(id)
-  const { internalPort } = port
-  const binding = await bindingState(effects, {
-    packageId,
-    hostId,
-    internalPort,
-  }).const()
+  const watch = (internalPort: number) =>
+    bindingState(effects, { packageId, hostId, internalPort }).const()
+  const binding = await watch(port.internalPort)
   if (!binding?.enabled || !binding.exported) return null
-  const ssl = onionPortSsl(port, binding)
+  const internalPort =
+    (await storeJson
+      .read((s) => s.targets?.[targetId(packageId, hostId, port.internalPort)])
+      .const(effects)) ?? port.internalPort
+  const target =
+    internalPort === port.internalPort ? binding : await watch(internalPort)
+  // An exported target is on the LAN, where clearnet clients reach it too.
+  if (!target?.enabled || (target !== binding && target.exported)) return null
+  const ssl = onionPortSsl(port, target)
   const address = await sdk.host
     .getBridgeAddress(effects, { packageId, hostId, internalPort, ssl })
     .const()

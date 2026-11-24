@@ -80,7 +80,7 @@ Inside the `tor` volume:
 | `store.json` | `startos` | JSON   | Yes — `FileHelper.json`           | The actions, the URL plugin, init |
 | `torrc`      | `tor`     | Text   | No — written, never read as state | `init/renderTorrc`                |
 
-**`store.json` is the source of truth.** It holds `automaticRecovery`; `bridges`, the bridge lines Tor connects through, without the `Bridge` keyword, where none means a direct connection; and `onions`: a record keyed `<package>/<host>/<index>`, each entry carrying its `ports` (`externalPort`, `internalPort`, `ssl`). A moved address also carries `keyId`, the original key directory's identity; moving the mapping leaves the key files in place. It does not hold a forward target, and nothing in it is ever removed automatically.
+**`store.json` is the source of truth.** It holds `automaticRecovery`; `bridges`, the bridge lines Tor connects through, without the `Bridge` keyword, where none means a direct connection; and `onions`: a record keyed `<package>/<host>/<index>`, each entry carrying its `ports` (`externalPort`, `internalPort`, `ssl`). A moved address also carries `keyId`, the original key directory's identity; moving the mapping leaves the key files in place. `targets`, keyed `<package>/<host>/<internalPort>`, holds the port a service named with Set Onion Target for that binding's onions. It never holds a resolved forward address, and nothing in it is ever removed automatically.
 
 **`torrc` is rendered from it, one way.** A line beginning `# ===== Everything below this line is generated` splits the file:
 
@@ -89,7 +89,7 @@ Inside the `tor` volume:
 - **A change is reloaded in place, except a change to the `Bridge` lines**, which restarts Tor: Tor bootstraps through new bridges only when it starts.
 - Tor takes the **last** value of a single-valued option, so the generated `DataDirectory` wins over one written above the marker. List options such as `SocksPort` are additive, so a user can add a listener but not displace the package's.
 
-**An onion's forward target is resolved when the file is rendered**, from the live binding, and the render re-runs whenever a target or the binding's exported interfaces change. A port whose binding exports no service interface, or that has no bridge address, is left out, and an address with no port left to forward to is not written at all. Nothing stale is ever kept to point at a port another service might later hold.
+**An onion's forward target is resolved when the file is rendered**, from the live binding, and the render re-runs whenever a target or the binding's exported interfaces change. A port whose binding exports no service interface, or that has no bridge address, is left out, and an address with no port left to forward to is not written at all. Nothing stale is ever kept to point at a port another service might later hold. A binding whose service set a target forwards its onions to that port on the same host instead of its own. The port is left out, never falling back to the binding itself, while the target is unbound, disabled or exports a service interface: an exported port is on the LAN, where clearnet clients reach it too.
 
 ## Dependencies
 
@@ -144,6 +144,15 @@ The plugin's table actions — StartOS invokes them from an interface page.
 - **Add** attaches an address to the interface's binding: a new one, optionally from a supplied key (a base64 64-byte expanded ed25519 key with a clamped scalar; anything else is refused before a file is written), or an existing address of the same package. It refuses a binding that is disabled or does not export the interface named in `urlPluginMetadata`. An address in use stays on its host; an entirely unused one can be explicitly moved to another host within that package, retaining its hostname and original key directory. Attaching to an existing address sheds any mapping of its whose binding is gone.
 - **Delete** detaches: it removes that port's mapping and nothing else. The key stays, and an address left with no port becomes unused.
 - **Services call them too.** Both are `access: 'public'`, so any installed service can run them through `effects.action.run` to manage its own addresses — for instance, to move an address back onto a port it renumbered. Each checks the action's `caller` against `urlPluginMetadata.packageId` and refuses a service acting on another's host; the user, whose `caller` is `null`, may act on any. Add runs the check in its input form too, so a service cannot list another's unused addresses either. The input is the one the interface page sends: `urlPluginMetadata` names the package, host, interface and internal port, and `address.selection` is `new` or one of the address ids the form offers.
+
+### Set Onion Target (hidden)
+
+For services, never the user: it lets a service tell onion connections from clearnet ones by receiving them on a port of their own. Bitcoin does this so it advertises only its onion address to onion peers.
+
+- **Input:** `onionTarget` names the package, host and internal port of a binding, and `target`, another port on that host, or `null` to forward to the binding itself again. A target equal to the binding's own port is refused.
+- **Access:** `access: 'public'`, and checked against `caller` like Add and Delete, so a service sets targets on its own hosts only.
+- **What it changes:** the `targets` entry in `store.json`. Rendering follows it at once.
+- **Calling it:** import `setupOnionTarget` from `tor-startos/startos/utils/target`. It is an init script that runs the action whenever Tor is installed or updated, and does nothing while Tor is absent or older than `0.4.9.17:4`. Until it runs, onions forward to the binding's own port.
 
 ### Delete Unused Onion Addresses
 
@@ -252,7 +261,7 @@ volumes:
   tor: /var/lib/tor
   startos: host side, never mounted (store.json; one-time onion import)
 file_models:
-  - store.json # startos volume; source of truth: onions + bridges + automaticRecovery
+  - store.json # startos volume; source of truth: onions + bridges + automaticRecovery + targets
 generated_files:
   - /var/lib/tor/torrc # user section above the marker is kept; the rest is rendered from store.json
 disposable:
@@ -268,6 +277,7 @@ interfaces: []
 actions:
   - add-onion-service # hidden; url-v0 plugin; public, a service may call it for its own hosts
   - delete-onion-service # hidden; url-v0 plugin; public, a service may call it for its own hosts
+  - set-onion-target # hidden; public; a service redirects its own binding's onions to another port on the host
   - delete-unused-addresses # the only action that destroys a key
   - reset-connection # only-running
   - automatic-recovery # toggles store.json automaticRecovery; off = fail closed

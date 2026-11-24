@@ -17,6 +17,8 @@ require.extensions['.ts'] = (module, filename) => {
 }
 
 const { setupOnionReattachment } = require('../startos/utils/reattach.ts')
+const { setupOnionTarget } = require('../startos/utils/target.ts')
+const { sdk: realSdk } = require('../startos/sdk.ts')
 
 const watch = (read) => ({
   once: async () => read(),
@@ -82,7 +84,7 @@ const effects = {
     },
   },
 }
-const reattach = setupOnionReattachment(sdk, {
+const reattachment = {
   packageId: 'bitcoind',
   hostId: 'peer',
   to: { interfaceId: 'peer', internalPort: 58333, ssl: false },
@@ -90,7 +92,14 @@ const reattach = setupOnionReattachment(sdk, {
   clear: async () => {
     pending = false
   },
-})
+}
+const reattach = setupOnionReattachment(sdk, reattachment)
+const onionTarget = {
+  packageId: 'bitcoind',
+  hostId: 'peer',
+  internalPort: 58333,
+  target: 58335,
+}
 
 beforeEach(() => {
   pending = true
@@ -164,3 +173,71 @@ test('ssl is answered only when the form asks for it', async () => {
   await reattach(effects)
   assert.equal(calls[1].ssl, false)
 })
+
+test('onion target setup skips absent and older Tor and submits the public contract', async () => {
+  const inputs = []
+  const targetSdk = {
+    ...sdk,
+    action: {
+      run: async (opts) => {
+        assert.equal(opts.packageId, 'tor')
+        assert.equal(opts.actionId, 'set-onion-target')
+        inputs.push(opts.input({ spec: {}, value: null }))
+      },
+    },
+  }
+  const init = setupOnionTarget(targetSdk, onionTarget)
+  for (version of [null, '0.4.9.17:3']) await init(effects)
+  assert.deepEqual(inputs, [])
+  version = '0.4.9.17:4'
+  await init(effects)
+  assert.deepEqual(inputs, [{ onionTarget }])
+  await setupOnionTarget(targetSdk, { ...onionTarget, target: null })(effects)
+  assert.equal(inputs[1].onionTarget.target, null)
+})
+
+for (const [name, setup] of [
+  ['target registration', (sdk) => setupOnionTarget(sdk, onionTarget)],
+  ['reattachment', (sdk) => setupOnionReattachment(sdk, reattachment)],
+]) {
+  test(
+    `${name} retries when Tor finishes installing at the same version`,
+    { timeout: 1000 },
+    async () => {
+      version = '0.4.9.17:4'
+      let changed
+      let available = false
+      let attempts = 0
+      const lifecycleSdk = {
+        ...sdk,
+        getServiceManifest: realSdk.getServiceManifest,
+        action: {
+          run: async () => {
+            attempts += 1
+            if (!available) throw new Error('Tor action not registered')
+          },
+        },
+      }
+      const init = setup(lifecycleSdk)
+      const lifecycleEffects = {
+        ...effects,
+        isInContext: true,
+        onLeaveContext: () => {},
+        getServiceManifest: async ({ callback }) => {
+          changed = callback
+          return { version }
+        },
+      }
+      const retried = new Promise((resolve, reject) => {
+        lifecycleEffects.constRetry = () =>
+          init(lifecycleEffects).then(resolve, reject)
+      })
+      await init(lifecycleEffects)
+      assert.equal(attempts, 1)
+      available = true
+      changed()
+      await retried
+      assert.equal(attempts, 2)
+    },
+  )
+}

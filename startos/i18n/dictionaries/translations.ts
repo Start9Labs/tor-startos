@@ -66,6 +66,8 @@ export default {
     61: 'Tor guarda las claves de estas direcciones, pero ninguna interfaz las usa:',
     62: 'Entre ellas puede haber direcciones traídas de StartOS 0.3.5. Para volver a publicar una, abra la interfaz en la que la quiere, agregue una dirección .onion y elija la dirección existente de la lista en lugar de crear una nueva. **Eliminar direcciones onion sin usar**, en las acciones de Tor, elimina definitivamente las que ya no necesite.',
     63: 'Este puerto no tiene ninguna interfaz, así que no puede tener una dirección .onion',
+    64: 'Establecer destino onion',
+    65: 'Reenvía las direcciones .onion de un puerto de un servicio a otro de sus puertos',
   },
   de_DE: {
     0: 'Tor läuft',
@@ -132,6 +134,8 @@ export default {
     61: 'Tor verwahrt die Schlüssel dieser Adressen, aber keine Schnittstelle nutzt sie:',
     62: 'Darunter können Adressen sein, die aus StartOS 0.3.5 übernommen wurden. Um eine wieder zu veröffentlichen, öffnen Sie die Schnittstelle, an der Sie sie haben möchten, fügen eine .onion-Adresse hinzu und wählen die vorhandene Adresse aus der Liste, statt eine neue zu erstellen. **Ungenutzte Onion-Adressen löschen** in den Aktionen von Tor löscht die nicht mehr benötigten endgültig.',
     63: 'Dieser Port hat keine Schnittstelle und kann daher keine .onion-Adresse haben',
+    64: 'Onion-Ziel festlegen',
+    65: 'Leitet die .onion-Adressen eines Dienstports an einen anderen Port desselben Dienstes weiter',
   },
   pl_PL: {
     0: 'Tor działa',
@@ -198,6 +202,8 @@ export default {
     61: 'Tor przechowuje klucze tych adresów, ale żaden interfejs ich nie używa:',
     62: 'Mogą być wśród nich adresy przeniesione ze StartOS 0.3.5. Aby ponownie opublikować adres, otwórz interfejs, na którym ma działać, dodaj adres .onion i wybierz istniejący adres z listy zamiast tworzyć nowy. Akcja **Usuń nieużywane adresy onion** w akcjach Tora trwale usuwa te, których już nie potrzebujesz.',
     63: 'Ten port nie ma interfejsu, więc nie może mieć adresu .onion',
+    64: 'Ustaw cel onion',
+    65: 'Przekierowuje adresy .onion portu usługi na inny port tej usługi',
   },
   fr_FR: {
     0: 'Tor fonctionne',
@@ -264,5 +270,7 @@ export default {
     61: 'Tor conserve les clés de ces adresses, mais aucune interface ne les utilise :',
     62: "Des adresses reprises de StartOS 0.3.5 peuvent en faire partie. Pour en publier une à nouveau, ouvrez l'interface où vous la voulez, ajoutez une adresse .onion et choisissez l'adresse existante dans la liste au lieu d'en créer une nouvelle. **Supprimer les adresses onion inutilisées**, dans les actions de Tor, supprime définitivement celles dont vous n'avez plus besoin.",
     63: "Ce port n'a aucune interface, il ne peut donc pas avoir d'adresse .onion",
+    64: 'Définir la cible onion',
+    65: "Redirige les adresses .onion d'un port d'un service vers un autre de ses ports",
   },
 } satisfies Record<string, LangDict>
