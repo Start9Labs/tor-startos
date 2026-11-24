@@ -1,18 +1,18 @@
 import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '0.4.9.17:2',
+  version: '0.4.9.17:3',
   releaseNotes: {
     en_US:
-      'Updated the Snowflake bridge transport to 2.15.4. It fixes security flaws that let a crafted response crash Snowflake or exhaust its memory while connecting through a Snowflake bridge. Full notes: https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/snowflake/-/blob/v2.15.4/ChangeLog',
+      'A .onion address is published only on ports that belong to a service interface. An address none of whose ports belongs to one is listed by Delete Unused Onion Addresses, and its key is kept until you delete it.',
     es_ES:
-      'Se actualizó el transporte de puente Snowflake a 2.15.4. Corrige fallos de seguridad que permitían que una respuesta manipulada bloqueara Snowflake o agotara su memoria al conectarse a través de un puente Snowflake. Notas completas: https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/snowflake/-/blob/v2.15.4/ChangeLog',
+      'Una dirección .onion solo se publica en los puertos que pertenecen a una interfaz de servicio. Una dirección cuyos puertos no pertenecen a ninguna aparece en Eliminar direcciones onion sin usar, y su clave se conserva hasta que la elimine.',
     de_DE:
-      'Der Snowflake-Bridge-Transport wurde auf 2.15.4 aktualisiert. Er behebt Sicherheitslücken, durch die eine manipulierte Antwort Snowflake beim Verbinden über eine Snowflake-Brücke zum Absturz bringen oder seinen Speicher erschöpfen konnte. Vollständige Hinweise: https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/snowflake/-/blob/v2.15.4/ChangeLog',
+      'Eine .onion-Adresse wird nur auf Ports veröffentlicht, die zu einer Dienstschnittstelle gehören. Eine Adresse, von deren Ports keiner zu einer gehört, wird unter Nicht verwendete Onion-Adressen löschen aufgeführt, und ihr Schlüssel bleibt erhalten, bis Sie sie löschen.',
     pl_PL:
-      'Zaktualizowano transport mostków Snowflake do wersji 2.15.4. Usuwa luki bezpieczeństwa, przez które spreparowana odpowiedź mogła spowodować awarię Snowflake lub wyczerpać jego pamięć podczas łączenia przez mostek Snowflake. Pełne informacje: https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/snowflake/-/blob/v2.15.4/ChangeLog',
+      'Adres .onion jest publikowany tylko na portach należących do interfejsu usługi. Adres, którego żaden port nie należy do interfejsu, pojawia się w akcji Usuń nieużywane adresy onion, a jego klucz zostaje zachowany, dopóki go nie usuniesz.',
     fr_FR:
-      "Le transport de pont Snowflake a été mis à jour vers la version 2.15.4. Elle corrige des failles de sécurité qui permettaient à une réponse malveillante de faire planter Snowflake ou d'épuiser sa mémoire lors d'une connexion via un pont Snowflake. Notes complètes : https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/snowflake/-/blob/v2.15.4/ChangeLog",
+      "Une adresse .onion n'est publiée que sur les ports qui appartiennent à une interface de service. Une adresse dont aucun port n'appartient à une interface figure dans Supprimer les adresses onion inutilisées, et sa clé est conservée jusqu'à ce que vous la supprimiez.",
   },
   migrations: {
     up: async () => {},

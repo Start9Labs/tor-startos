@@ -16,7 +16,7 @@ export const registerUrlPlugin = sdk.setupOnInit(async (effects) =>
 
 /**
  * Exports every onion to the interface it serves. An address whose host or
- * binding is absent or disabled is skipped, not removed: nothing here deletes a
+ * binding is absent, disabled or exports no interface is skipped, not removed: nothing here deletes a
  * mapping or a key, so a service that is restored, reinstalled, re-bound or
  * re-enabled later gets its address back, and a key goes only when the user
  * deletes it.

@@ -32,8 +32,8 @@ export type OnionReattachment = {
 /**
  * An init script that moves a host's unused .onion addresses to a binding,
  * keeping each hostname, after a migration retired the binding they served.
- * It waits for the flag, the binding and a Tor that allows it, and keeps the
- * flag set until the move succeeds.
+ * It waits for the flag, the binding, its interface and a Tor that allows it,
+ * and keeps the flag set until the move succeeds.
  */
 export function setupOnionReattachment(
   sdk: Pick<Sdk, 'setupOnInit' | 'host' | 'getServiceManifest' | 'action'>,
@@ -82,14 +82,17 @@ export function setupOnionReattachment(
   return sdk.setupOnInit(async (effects) => {
     if (!(await opts.pending.const(effects))) return
 
-    const enabled = await sdk.host
+    const ready = await sdk.host
       .get(
         effects,
         { hostId: opts.hostId, packageId: opts.packageId },
-        (host) => host?.bindings[opts.to.internalPort]?.enabled ?? false,
+        (host) => {
+          const binding = host?.bindings[opts.to.internalPort]
+          return !!binding?.enabled && !!binding.interfaces[opts.to.interfaceId]
+        },
       )
       .const()
-    if (!enabled) return
+    if (!ready) return
 
     const torVersion = await sdk
       .getServiceManifest(effects, 'tor', (m) => m?.version ?? null)

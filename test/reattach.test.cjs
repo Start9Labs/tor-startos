@@ -22,7 +22,15 @@ const watch = (read) => ({
   once: async () => read(),
   const: async () => read(),
 })
-let pending, enabled, served, version, variants, formHasSsl, calls, fail
+let pending,
+  enabled,
+  interfaces,
+  served,
+  version,
+  variants,
+  formHasSsl,
+  calls,
+  fail
 const sdk = {
   setupOnInit: (fn) => fn,
   host: {
@@ -33,6 +41,7 @@ const sdk = {
           bindings: {
             58333: {
               enabled,
+              interfaces,
               addresses: {
                 available: served.map((hostname) => ({
                   hostname,
@@ -86,6 +95,7 @@ const reattach = setupOnionReattachment(sdk, {
 beforeEach(() => {
   pending = true
   enabled = true
+  interfaces = { peer: { type: 'p2p' } }
   served = []
   version = '0.4.9.13:1'
   variants = { 'bitcoind/peer/0': { name: 'a.onion' }, new: { name: 'New' } }
@@ -122,6 +132,16 @@ test('a disabled binding waits, and enabling it completes the move', async () =>
   await reattach(effects)
   assert.equal(pending, true)
   enabled = true
+  await reattach(effects)
+  assert.equal(pending, false)
+})
+
+test('a binding without the interface waits, and exporting it completes the move', async () => {
+  interfaces = {}
+  await reattach(effects)
+  assert.equal(pending, true)
+  assert.deepEqual(calls, [])
+  interfaces = { peer: { type: 'p2p' } }
   await reattach(effects)
   assert.equal(pending, false)
 })
