@@ -28,13 +28,13 @@ Open the specific interface of the other service you want to expose over Tor. On
 
 Your `.onion` addresses look after themselves once they exist. If a service's ports move, the address follows them without you doing anything, and the address itself never changes.
 
-If an update to a service removes the port an address was attached to, the address is kept. Open the interface you want it on, add a `.onion` address, and pick the existing address from the list instead of creating a new one. An entirely unused address can move to another host of the same service; an address still in use stays on its existing host. This is an explicit choice, not an automatic host migration.
+Tor publishes a `.onion` address only on ports that belong to one of the service's interfaces. If an update to a service removes the port or the interface an address was attached to, the address stops being published and is kept. Open the interface you want it on, add a `.onion` address, and pick the existing address from the list instead of creating a new one. An entirely unused address can move to another host of the same service; an address still in use stays on its existing host. This is an explicit choice, not an automatic host migration.
 
 ### Removing a .onion address
 
 Removing an address from an interface's **Tor** table detaches it; its key is kept, so you can attach the same address again later.
 
-To delete addresses for good, open Tor's **Actions** menu and run **Delete Unused Onion Addresses**. It lists every `.onion` address that no interface is using — ones you detached, and ones whose service was uninstalled or no longer has the port — with all of them selected. Untick any you want to keep. Deleting is permanent — the key goes with the address. If StartOS cannot check whether an address is in use, the action fails without deleting any keys; retry once that check is available.
+To delete addresses for good, open Tor's **Actions** menu and run **Delete Unused Onion Addresses**. It lists every `.onion` address that no interface is using — ones you detached, and ones whose service was uninstalled, no longer has the port, or no longer offers an interface on it — with all of them selected. Untick any you want to keep. Deleting is permanent — the key goes with the address. If StartOS cannot check whether an address is in use, the action fails without deleting any keys; retry once that check is available.
 
 ### Restoring from a backup
 

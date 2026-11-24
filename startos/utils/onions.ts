@@ -31,10 +31,14 @@ export const onionHostname = (id: string, onion?: Onion) =>
 
 type BindingState = {
   enabled: boolean
+  exported: boolean
   options: { secure?: { ssl: boolean } | null }
 }
 
-export function onionPortSsl(port: OnionPort, binding: BindingState | null) {
+export function onionPortSsl(
+  port: OnionPort,
+  binding: Pick<BindingState, 'options'> | null,
+) {
   return port.nativeProtocol ? binding?.options.secure?.ssl === true : port.ssl
 }
 
@@ -50,6 +54,7 @@ const bindingState = (
       return binding
         ? {
             enabled: binding.enabled,
+            exported: Object.keys(binding.interfaces).length > 0,
             options: { secure: binding.options.secure },
           }
         : null
@@ -68,7 +73,7 @@ export async function watchOnionTarget(
     hostId,
     internalPort,
   }).const()
-  if (!binding?.enabled) return null
+  if (!binding?.enabled || !binding.exported) return null
   const ssl = onionPortSsl(port, binding)
   const address = await sdk.host
     .getBridgeAddress(effects, { packageId, hostId, internalPort, ssl })
@@ -77,10 +82,9 @@ export async function watchOnionTarget(
 }
 
 /**
- * Whether any port of the address belongs to its service right now: an enabled
- * binding that resolves, or a disabled one. A disabled binding is not served,
- * but its service still holds the port and can enable it again, so its address
- * is not unused.
+ * Whether any port of the address is on a binding that exports a service
+ * interface and either resolves or is disabled. A disabled binding is not
+ * served, but its service can enable it again, so its address is not unused.
  */
 export async function isServed(effects: T.Effects, id: string, onion: Onion) {
   const { packageId, hostId } = parseOnionId(id)
@@ -91,8 +95,8 @@ export async function isServed(effects: T.Effects, id: string, onion: Onion) {
       hostId,
       internalPort,
     }).once()
-    if (binding?.enabled === false) return true
-    if (binding === null) continue
+    if (!binding?.exported) continue
+    if (!binding.enabled) return true
     const ssl = onionPortSsl(port, binding)
     const target = await sdk.host
       .getBridgeAddress(effects, { packageId, hostId, internalPort, ssl })
@@ -102,7 +106,7 @@ export async function isServed(effects: T.Effects, id: string, onion: Onion) {
   return false
 }
 
-/** The addresses no interface is using: no port of theirs resolves. */
+/** The addresses no interface is using. */
 export async function unusedAddresses(effects: T.Effects) {
   const onions = present(await storeJson.read((s) => s.onions).once())
   const unused: string[] = []

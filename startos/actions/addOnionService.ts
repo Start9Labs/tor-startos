@@ -80,7 +80,7 @@ const inputSpec = InputSpec.of({
   }))
   .add(({ Value }) => ({
     address: Value.dynamicUnion(async ({ effects, prefill }) => {
-      const { packageId, hostId, internalPort } =
+      const { packageId, hostId, interfaceId, internalPort } =
         prefill?.urlPluginMetadata ?? {}
 
       const onions = present(await storeJson.read((s) => s.onions).once())
@@ -99,9 +99,10 @@ const inputSpec = InputSpec.of({
               .once()
           : null
       const nativeSsl = binding?.options.secure?.ssl === true
-      const availNonSsl = !!binding?.enabled && !nativeSsl
-      const availSsl =
-        !!binding?.enabled && (nativeSsl || !!binding.options.addSsl)
+      const servable =
+        !!binding?.enabled && !!interfaceId && !!binding.interfaces[interfaceId]
+      const availNonSsl = servable && !nativeSsl
+      const availSsl = servable && (nativeSsl || !!binding?.options.addSsl)
 
       const variants: Record<
         string,
@@ -195,7 +196,8 @@ export const addOnionService = sdk.Action.withInput(
 
   // execution
   async ({ effects, input, caller }) => {
-    const { packageId, hostId, internalPort } = input.urlPluginMetadata
+    const { packageId, hostId, interfaceId, internalPort } =
+      input.urlPluginMetadata
     requireOwner(caller, packageId)
     const address = input.address as {
       selection: string
@@ -212,6 +214,11 @@ export const addOnionService = sdk.Action.withInput(
     if (!binding?.enabled) {
       throw new Error(
         `Cannot create an onion service for "${packageId}": interface binding ${internalPort} is not exposed, so there is no reachable endpoint to forward to.`,
+      )
+    }
+    if (!binding.interfaces[interfaceId]) {
+      throw new Error(
+        i18n('This port has no interface, so it cannot have a .onion address'),
       )
     }
 

@@ -156,6 +156,53 @@ test('rendering and URL export require the same enabled bridge leg', async () =>
   assert.ok(await onionHostname(id))
 })
 
+test('a port with no interface is neither served nor in use, and an interface brings it back', async () => {
+  const id = 'bitcoind/peer/0'
+  const files = await seed(id)
+  for (const enabled of [true, false]) {
+    hosts['bitcoind/peer'].bindings[58333] = {
+      ...binding(enabled),
+      interfaces: {},
+    }
+    exported = []
+    await renderTorrc(effects)
+    await exportUrls({ effects })
+    assert.equal(torrc.includes('HiddenServicePort 8333'), false)
+    assert.equal(exported.length, 0)
+    assert.equal(await isServed(effects, id, contents.onions[id]), false)
+    const form = await deleteUnusedAddresses.getInput({ effects, caller: null })
+    assert.ok(JSON.stringify(form.spec).includes(files.hostname))
+  }
+  assert.ok(contents.onions[id])
+  assert.equal(await onionHostname(id), files.hostname)
+
+  hosts['bitcoind/peer'].bindings[58333] = binding()
+  await renderTorrc(effects)
+  assert.ok(torrc.includes('HiddenServicePort 8333 10.0.3.1:50000'))
+  assert.equal(await isServed(effects, id, contents.onions[id]), true)
+})
+
+test('an address is in use while any of its ports has an interface', async () => {
+  const id = 'bitcoind/peer/0'
+  const other = { externalPort: 28332, internalPort: 28332, ssl: false }
+  await seed(id, [port, other])
+  hosts['bitcoind/peer'].bindings[28332] = { ...binding(), interfaces: {} }
+  addresses['bitcoind/peer/28332/false'] = '10.0.3.1:28332'
+  await renderTorrc(effects)
+  assert.ok(torrc.includes('HiddenServicePort 8333 '))
+  assert.equal(torrc.includes('HiddenServicePort 28332'), false)
+  assert.equal(await isServed(effects, id, contents.onions[id]), true)
+})
+
+test('an onion cannot be added to a port with no interface', async () => {
+  hosts['bitcoind/peer'].bindings[58333] = { ...binding(), interfaces: {} }
+  await assert.rejects(
+    run(addOnionService, input('new'), 'bitcoind'),
+    /no interface/,
+  )
+  assert.deepEqual(contents.onions, {})
+})
+
 test('legacy peer-port reuse retains the hostname and public onion port', async () => {
   const id = 'bitcoind/peer/0'
   const files = await seed(id, [{ ...port, internalPort: 8333 }])

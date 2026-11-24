@@ -14,8 +14,8 @@ import { watchOnionTarget } from '../utils/onions'
 /**
  * Renders the torrc from the store and the live bindings. A forward target is
  * resolved here and never stored, so a binding whose port moves is followed,
- * and a port that is disabled or has no bridge address is left out rather than
- * pointed anywhere. Each target is a `.const()`, so this re-runs when one
+ * and a port that is disabled, exports no interface or has no bridge address is
+ * left out rather than pointed anywhere. Each target is a `.const()`, so this re-runs when one
  * changes.
  */
 export const renderTorrc = sdk.setupOnInit(async (effects) => {
