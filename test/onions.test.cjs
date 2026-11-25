@@ -339,29 +339,31 @@ test('choosing an external port moves historical native ports but preserves OS-a
   }
 })
 
-test('onion targets fail closed and follow the live bridge without changing the key', async () => {
+test('onion targets follow the live bindings and the bridge without changing the key', async () => {
   const id = 'bitcoind/peer/0'
   const files = await seed(id)
   contents.targets = { [store.targetId('bitcoind', 'peer', 58333)]: 58335 }
   const bindings = hosts['bitcoind/peer'].bindings
   const target = { ...binding(), interfaces: {} }
   addresses['bitcoind/peer/58335/false'] = '10.0.3.1:50001'
-  for (const [state, served] of [
-    [undefined, false],
-    [{ ...target, enabled: false }, false],
-    [binding(), false],
-    [target, true],
+  // Absent or disabled: the running version doesn't bind the target.
+  for (const [state, forward] of [
+    [undefined, '10.0.3.1:50000'],
+    [{ ...target, enabled: false }, '10.0.3.1:50000'],
+    [binding(), null],
+    [target, '10.0.3.1:50001'],
   ]) {
     bindings[58335] = state
     exported = []
     await renderTorrc(effects)
     await exportUrls({ effects })
-    assert.equal(
-      torrc.includes('HiddenServicePort 8333 10.0.3.1:50001'),
-      served,
-    )
-    assert.equal(torrc.includes('10.0.3.1:50000'), false)
-    assert.equal(exported.length, served ? 1 : 0)
+    for (const address of ['10.0.3.1:50000', '10.0.3.1:50001']) {
+      assert.equal(
+        torrc.includes(`HiddenServicePort 8333 ${address}`),
+        address === forward,
+      )
+    }
+    assert.equal(exported.length, forward ? 1 : 0)
   }
   addresses['bitcoind/peer/58335/false'] = null
   await renderTorrc(effects)
