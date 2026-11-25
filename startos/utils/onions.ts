@@ -43,6 +43,26 @@ export function onionPortSsl(
   return port.nativeProtocol ? binding?.options.secure?.ssl === true : port.ssl
 }
 
+/** An OS-added TLS leg, distinct from the binding's native protocol. */
+export function isAddedSslPort(
+  port: Pick<OnionPort, 'ssl' | 'nativeProtocol'>,
+  binding: Pick<BindingState, 'options'> | null,
+) {
+  return (
+    !port.nativeProtocol && port.ssl && binding?.options.secure?.ssl !== true
+  )
+}
+
+/** Rejects a collision without replacing the existing leg. */
+export function requireAvailableOnionPort(
+  ports: readonly OnionPort[],
+  externalPort: number,
+) {
+  if (ports.some((port) => port.externalPort === externalPort)) {
+    throw new Error(`An onion address already answers on port ${externalPort}`)
+  }
+}
+
 const bindingState = (
   effects: T.Effects,
   opts: { packageId: string; hostId: string; internalPort: number },

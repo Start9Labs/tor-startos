@@ -204,6 +204,141 @@ test('setting and clearing a target preserves other targets and store fields', a
   }
 })
 
+test('a chosen external port moves the binding addresses, is used for new ones, and clears', async () => {
+  const mocked = [
+    store.storeJson.read,
+    store.storeJson.write,
+    store.storeJson.merge,
+  ]
+  const commits = []
+  store.storeJson.read = readStore
+  store.storeJson.write = writeStore
+  store.storeJson.merge = async (...args) => {
+    const result = await mocked[2].apply(store.storeJson, args)
+    commits.push(await readStore().once())
+    return result
+  }
+  try {
+    const other = { externalPort: 9735, internalPort: 9735, ssl: false }
+    await writeStore(effects, {
+      automaticRecovery: true,
+      bridges: [],
+      onions: { 'bitcoind/peer/0': { ports: [port, other] } },
+    })
+    const value = (externalPort) => ({
+      onionTarget: { ...metadata(), target: 58335, externalPort },
+    })
+    const ports = async (id) => (await readStore().once()).onions[id].ports
+
+    await run(setOnionTarget, value(28722), 'bitcoind')
+    assert.deepEqual(commits[0].onions['bitcoind/peer/0'].ports, [
+      { ...port, externalPort: 28722 },
+      other,
+    ])
+    assert.deepEqual(await ports('bitcoind/peer/0'), [
+      { ...port, externalPort: 28722 },
+      other,
+    ])
+    assert.equal(
+      (await readStore().once()).externalPorts[
+        store.targetId('bitcoind', 'peer', 58333)
+      ],
+      28722,
+    )
+    await run(addOnionService, input('new'), 'bitcoind')
+    assert.deepEqual(await ports('bitcoind/peer/1'), [
+      { ...port, externalPort: 28722 },
+    ])
+    await assert.rejects(
+      run(setOnionTarget, value(9735), 'bitcoind'),
+      /already answers on port 9735/,
+    )
+    assert.deepEqual(await ports('bitcoind/peer/1'), [
+      { ...port, externalPort: 28722 },
+    ])
+
+    await run(setOnionTarget, value(null), 'bitcoind')
+    assert.deepEqual(await ports('bitcoind/peer/0'), [port, other])
+    assert.deepEqual(await ports('bitcoind/peer/1'), [port])
+    assert.deepEqual(commits.at(-1).onions['bitcoind/peer/0'].ports, [
+      port,
+      other,
+    ])
+  } finally {
+    ;[store.storeJson.read, store.storeJson.write, store.storeJson.merge] =
+      mocked
+  }
+})
+
+test('invalid chosen external ports are rejected without changing the store', async () => {
+  await seed('bitcoind/peer/0')
+  const before = structuredClone(contents)
+  for (const externalPort of [0, -1, 65536, 1.5, '28722']) {
+    await assert.rejects(
+      run(
+        setOnionTarget,
+        { onionTarget: { ...metadata(), target: null, externalPort } },
+        'bitcoind',
+      ),
+    )
+    assert.deepEqual(contents, before)
+  }
+})
+
+test('adding either protocol leg rejects a chosen-port collision without detaching the other', async () => {
+  const id = 'bitcoind/peer/0'
+  hosts['bitcoind/peer'].bindings[58333].options.addSsl = {
+    preferredExternalPort: 443,
+  }
+  contents.externalPorts = {
+    [store.targetId('bitcoind', 'peer', 58333)]: 443,
+  }
+  for (const ssl of [false, true]) {
+    await seed(id, [{ ...port, externalPort: 443, ssl }])
+    const before = structuredClone(contents)
+    await assert.rejects(
+      run(addOnionService, { ...input(id), ssl: !ssl }, 'bitcoind'),
+      /already answers on port 443/,
+    )
+    assert.deepEqual(contents, before)
+  }
+})
+
+test('choosing an external port moves historical native ports but preserves OS-added TLS', async () => {
+  const mocked = [store.storeJson.read, store.storeJson.write]
+  store.storeJson.read = readStore
+  store.storeJson.write = writeStore
+  try {
+    const id = 'bitcoind/peer/0'
+    const sslPort = { ...port, externalPort: 443, ssl: true }
+    hosts['bitcoind/peer'].bindings[58333].options.addSsl = {
+      preferredExternalPort: 443,
+    }
+    await writeStore(effects, {
+      automaticRecovery: true,
+      bridges: [],
+      onions: {
+        [id]: { ports: [{ ...port, externalPort: 18333 }, sslPort] },
+      },
+    })
+    const value = (externalPort) => ({
+      onionTarget: { ...metadata(), target: null, externalPort },
+    })
+    await run(setOnionTarget, value(28722), 'bitcoind')
+    assert.deepEqual((await readStore().once()).onions[id].ports, [
+      { ...port, externalPort: 28722 },
+      sslPort,
+    ])
+    await run(setOnionTarget, value(null), 'bitcoind')
+    assert.deepEqual((await readStore().once()).onions[id].ports, [
+      port,
+      sslPort,
+    ])
+  } finally {
+    ;[store.storeJson.read, store.storeJson.write] = mocked
+  }
+})
+
 test('onion targets fail closed and follow the live bridge without changing the key', async () => {
   const id = 'bitcoind/peer/0'
   const files = await seed(id)

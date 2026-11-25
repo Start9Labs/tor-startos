@@ -18,6 +18,8 @@ export type OnionTarget = {
   internalPort: number
   /** Another port on the host, bound with no exported interface. `null` clears it. */
   target: number | null
+  /** The port its .onion addresses answer on, in place of the binding's own. */
+  externalPort?: number | null
 }
 
 /**
@@ -35,6 +37,7 @@ export function setupOnionTarget(
     hostId: opts.hostId,
     internalPort: opts.internalPort,
     target: opts.target,
+    ...(opts.externalPort == null ? {} : { externalPort: opts.externalPort }),
   }
   return sdk.setupOnInit(async (effects) => {
     // The manifest precedes action registration; lifecycle changes must retry failed calls.

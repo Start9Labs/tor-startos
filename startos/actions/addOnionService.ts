@@ -5,15 +5,18 @@ import {
   parseOnionId,
   present,
   storeJson,
+  targetId,
   writeOnions,
 } from '../fileModels/store.json'
 import { i18n } from '../i18n'
 import { sdk } from '../sdk'
 import { generateOnionFiles } from '../utils'
 import {
+  isAddedSslPort,
   isServed,
   onionHostname,
   onionPortSsl,
+  requireAvailableOnionPort,
   requireOwner,
 } from '../utils/onions'
 
@@ -227,11 +230,13 @@ export const addOnionService = sdk.Action.withInput(
     // `addSsl` binding offers both, on two different external ports.
     const nativeSsl = binding.options.secure?.ssl === true
     const ssl = nativeSsl || (!!input.ssl && !!binding.options.addSsl)
+    const chosen = await storeJson
+      .read((s) => s.externalPorts?.[targetId(packageId, hostId, internalPort)])
+      .once()
     const port = {
-      externalPort:
-        !nativeSsl && ssl
-          ? binding.options.addSsl!.preferredExternalPort
-          : binding.options.preferredExternalPort,
+      externalPort: isAddedSslPort({ ssl }, binding)
+        ? binding.options.addSsl!.preferredExternalPort
+        : (chosen ?? binding.options.preferredExternalPort),
       internalPort,
       ssl,
     }
@@ -287,16 +292,13 @@ export const addOnionService = sdk.Action.withInput(
         }
         delete onions[address.selection]
       } else {
+        const retained = existing.ports.filter((p) =>
+          bound.includes(p.internalPort),
+        )
+        requireAvailableOnionPort(retained, port.externalPort)
         onions[address.selection] = {
           ...existing,
-          ports: [
-            ...existing.ports.filter(
-              (p) =>
-                bound.includes(p.internalPort) &&
-                p.externalPort !== port.externalPort,
-            ),
-            port,
-          ],
+          ports: [...retained, port],
         }
       }
     } else {

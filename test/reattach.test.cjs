@@ -194,6 +194,11 @@ test('onion target setup skips absent and older Tor and submits the public contr
   assert.deepEqual(inputs, [{ onionTarget }])
   await setupOnionTarget(targetSdk, { ...onionTarget, target: null })(effects)
   assert.equal(inputs[1].onionTarget.target, null)
+  assert.equal('externalPort' in inputs[1].onionTarget, false)
+  await setupOnionTarget(targetSdk, { ...onionTarget, externalPort: 28722 })(
+    effects,
+  )
+  assert.equal(inputs[2].onionTarget.externalPort, 28722)
 })
 
 for (const [name, setup] of [
