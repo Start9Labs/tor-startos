@@ -94,8 +94,14 @@ export function setupOnionReattachment(
       .const()
     if (!ready) return
 
+    // The manifest precedes action registration; lifecycle changes must retry failed calls.
     const torVersion = await sdk
-      .getServiceManifest(effects, 'tor', (m) => m?.version ?? null)
+      .getServiceManifest(
+        effects,
+        'tor',
+        (m) => m?.version ?? null,
+        () => false,
+      )
       .const()
     if (
       !torVersion ||

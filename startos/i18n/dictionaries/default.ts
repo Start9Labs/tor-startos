@@ -65,6 +65,8 @@ const dict = {
   'Tor holds the keys of these addresses, but no interface uses them:': 61,
   'Addresses carried over from StartOS 0.3.5 can be among them. To publish one again, open the interface you want it on, add a .onion address, and pick the existing address from the list instead of creating a new one. **Delete Unused Onion Addresses**, in Tor’s Actions, permanently deletes the ones you no longer need.': 62,
   'This port has no interface, so it cannot have a .onion address': 63,
+  'Set Onion Target': 64,
+  'Forward the .onion addresses of a service port to another of its ports': 65,
 } as const
 
 export type I18nKey = keyof typeof dict

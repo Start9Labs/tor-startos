@@ -30,6 +30,11 @@ const shape = z.looseObject({
   automaticRecovery: z.boolean().catch(true),
   /** Bridge lines without the `Bridge` keyword. None connects directly. */
   bridges: z.array(z.string()).catch([]),
+  /** Keyed by `targetId`: the port a binding's service names for its onion connections. */
+  targets: z
+    .record(z.string(), z.number().optional().catch(undefined))
+    .optional()
+    .catch(undefined),
 })
 
 export type Onion = z.infer<typeof onionShape>
@@ -46,6 +51,12 @@ export const STORE_LOCATION = "store.json on this package's startos volume"
 
 export const onionId = (packageId: string, hostId: string, index: string) =>
   `${packageId}/${hostId}/${index}`
+
+export const targetId = (
+  packageId: string,
+  hostId: string,
+  internalPort: number,
+) => `${packageId}/${hostId}/${internalPort}`
 
 export function parseOnionId(id: string) {
   const [packageId, hostId, index] = id.split('/')

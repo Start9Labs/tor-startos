@@ -48,6 +48,8 @@ sdk.host.getBridgeAddress = (
   )
 
 const store = require('../startos/fileModels/store.json.ts')
+const readStore = store.storeJson.read.bind(store.storeJson)
+const writeStore = store.storeJson.write.bind(store.storeJson)
 store.storeJson.read = (project = (value) => value) =>
   watch(() => project(structuredClone(contents)))
 store.storeJson.write = async (_effects, value) => {
@@ -67,6 +69,7 @@ const {
 const {
   deleteUnusedAddresses,
 } = require('../startos/actions/deleteUnusedAddresses.ts')
+const { setOnionTarget } = require('../startos/actions/setOnionTarget.ts')
 const {
   migrateOnionAddresses,
 } = require('../startos/init/migrateOnionAddresses.ts')
@@ -154,6 +157,87 @@ test('rendering and URL export require the same enabled bridge leg', async () =>
   assert.equal(await isServed(effects, id, contents.onions[id]), false)
   assert.ok(contents.onions[id])
   assert.ok(await onionHostname(id))
+})
+
+test('setting and clearing a target preserves other targets and store fields', async () => {
+  const mockedRead = store.storeJson.read
+  store.storeJson.read = readStore
+  try {
+    const other = 'other/peer/9735'
+    const id = store.targetId('bitcoind', 'peer', 58333)
+    await writeStore(effects, {
+      automaticRecovery: false,
+      bridges: ['obfs4 bridge'],
+      onions: {},
+      targets: { [other]: 19735 },
+      futureField: 'preserved',
+    })
+    const value = (target) => ({
+      onionTarget: { ...metadata(), target },
+    })
+    for (const target of [58335, 58337]) {
+      await run(setOnionTarget, value(target), 'bitcoind')
+      assert.deepEqual((await readStore().once()).targets, {
+        [other]: 19735,
+        [id]: target,
+      })
+    }
+    await assert.rejects(
+      run(setOnionTarget, value(58335), 'other'),
+      /only manage its own/,
+    )
+    await assert.rejects(
+      run(setOnionTarget, value(58333), 'bitcoind'),
+      /other than/,
+    )
+    await run(setOnionTarget, value(null), 'bitcoind')
+    await run(setOnionTarget, value(null), 'bitcoind')
+    assert.deepEqual(await readStore().once(), {
+      automaticRecovery: false,
+      bridges: ['obfs4 bridge'],
+      onions: {},
+      targets: { [other]: 19735 },
+      futureField: 'preserved',
+    })
+  } finally {
+    store.storeJson.read = mockedRead
+  }
+})
+
+test('onion targets fail closed and follow the live bridge without changing the key', async () => {
+  const id = 'bitcoind/peer/0'
+  const files = await seed(id)
+  contents.targets = { [store.targetId('bitcoind', 'peer', 58333)]: 58335 }
+  const bindings = hosts['bitcoind/peer'].bindings
+  const target = { ...binding(), interfaces: {} }
+  addresses['bitcoind/peer/58335/false'] = '10.0.3.1:50001'
+  for (const [state, served] of [
+    [undefined, false],
+    [{ ...target, enabled: false }, false],
+    [binding(), false],
+    [target, true],
+  ]) {
+    bindings[58335] = state
+    exported = []
+    await renderTorrc(effects)
+    await exportUrls({ effects })
+    assert.equal(
+      torrc.includes('HiddenServicePort 8333 10.0.3.1:50001'),
+      served,
+    )
+    assert.equal(torrc.includes('10.0.3.1:50000'), false)
+    assert.equal(exported.length, served ? 1 : 0)
+  }
+  addresses['bitcoind/peer/58335/false'] = null
+  await renderTorrc(effects)
+  assert.equal(torrc.includes('HiddenServicePort 8333'), false)
+  addresses['bitcoind/peer/58335/false'] = '10.0.3.1:50002'
+  await renderTorrc(effects)
+  assert.ok(torrc.includes('HiddenServicePort 8333 10.0.3.1:50002'))
+  assert.equal(await onionHostname(id), files.hostname)
+  delete contents.targets
+  await renderTorrc(effects)
+  assert.ok(torrc.includes('HiddenServicePort 8333 10.0.3.1:50000'))
 })
 
 test('a port with no interface is neither served nor in use, and an interface brings it back', async () => {
