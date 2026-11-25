@@ -17,8 +17,12 @@ require.extensions['.ts'] = (module, filename) => {
 }
 
 const { setupOnionReattachment } = require('../startos/utils/reattach.ts')
-const { setupOnionTarget } = require('../startos/utils/target.ts')
+const {
+  clearOnionTarget,
+  setupOnionTarget,
+} = require('../startos/utils/target.ts')
 const { sdk: realSdk } = require('../startos/sdk.ts')
+const { ExtendedVersion, VersionRange } = require('@start9labs/start-sdk')
 
 const watch = (read) => ({
   once: async () => read(),
@@ -34,7 +38,7 @@ let pending,
   calls,
   fail
 const sdk = {
-  setupOnInit: (fn) => fn,
+  setupOnInit: (fn) => ({ init: fn }),
   host: {
     get: (_effects, opts, project) => {
       assert.deepEqual(opts, { hostId: 'peer', packageId: 'bitcoind' })
@@ -93,7 +97,7 @@ const reattachment = {
     pending = false
   },
 }
-const reattach = setupOnionReattachment(sdk, reattachment)
+const { init: reattach } = setupOnionReattachment(sdk, reattachment)
 const onionTarget = {
   packageId: 'bitcoind',
   hostId: 'peer',
@@ -186,19 +190,44 @@ test('onion target setup skips absent and older Tor and submits the public contr
       },
     },
   }
-  const init = setupOnionTarget(targetSdk, onionTarget)
+  const { init, uninit } = setupOnionTarget(targetSdk, onionTarget)
   for (version of [null, '0.4.9.17:3']) await init(effects)
   assert.deepEqual(inputs, [])
   version = '0.4.9.17:4'
   await init(effects)
   assert.deepEqual(inputs, [{ onionTarget }])
-  await setupOnionTarget(targetSdk, { ...onionTarget, target: null })(effects)
-  assert.equal(inputs[1].onionTarget.target, null)
-  assert.equal('externalPort' in inputs[1].onionTarget, false)
-  await setupOnionTarget(targetSdk, { ...onionTarget, externalPort: 28722 })(
+  await setupOnionTarget(targetSdk, { ...onionTarget, target: null }).init(
     effects,
   )
+  assert.equal(inputs[1].onionTarget.target, null)
+  assert.equal('externalPort' in inputs[1].onionTarget, false)
+  await setupOnionTarget(targetSdk, {
+    ...onionTarget,
+    externalPort: 28722,
+  }).init(effects)
   assert.equal(inputs[2].onionTarget.externalPort, 28722)
+
+  const cleared = {
+    onionTarget: {
+      packageId: onionTarget.packageId,
+      hostId: onionTarget.hostId,
+      internalPort: onionTarget.internalPort,
+      target: null,
+    },
+  }
+  // Shutdowns and updates name a version; only an uninstall names none.
+  await uninit(effects, ExtendedVersion.parse('29.4:1'))
+  await uninit(effects, VersionRange.parse('>=29.4:1'))
+  assert.equal(inputs.length, 3)
+  await uninit(effects, null)
+  assert.deepEqual(inputs.at(-1), cleared)
+  await clearOnionTarget(targetSdk, effects, onionTarget)
+  assert.deepEqual(inputs.at(-1), cleared)
+  assert.equal(inputs.length, 5)
+  version = null
+  await uninit(effects, null)
+  await clearOnionTarget(targetSdk, effects, onionTarget)
+  assert.equal(inputs.length, 5)
 })
 
 for (const [name, setup] of [
@@ -223,7 +252,7 @@ for (const [name, setup] of [
           },
         },
       }
-      const init = setup(lifecycleSdk)
+      const { init } = setup(lifecycleSdk)
       const lifecycleEffects = {
         ...effects,
         isInContext: true,

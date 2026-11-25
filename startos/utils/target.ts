@@ -22,11 +22,64 @@ export type OnionTarget = {
   externalPort?: number | null
 }
 
+type OnionBinding = Pick<OnionTarget, 'packageId' | 'hostId' | 'internalPort'>
+
+async function submit(
+  sdk: Pick<Sdk, 'action'>,
+  effects: T.Effects,
+  torVersion: string | null,
+  onionTarget: OnionBinding & Pick<OnionTarget, 'target' | 'externalPort'>,
+) {
+  if (
+    !torVersion ||
+    !ExtendedVersion.parse(torVersion).satisfies(servicesMaySetTargets)
+  )
+    return
+  try {
+    await sdk.action.run({
+      effects,
+      packageId: 'tor',
+      actionId: 'set-onion-target',
+      input: () => ({ onionTarget }),
+    })
+  } catch (e) {
+    console.warn(
+      `Onion target not ${onionTarget.target === null ? 'cleared' : 'set'}: ${String(e)}`,
+    )
+  }
+}
+
 /**
- * An init script that has Tor forward the .onion addresses of a binding to
- * another port on the same host, so the service can tell onion connections
- * from clearnet ones. It re-runs whenever Tor is installed or updated, and
- * does nothing while Tor is absent or predates the action.
+ * Clears a binding's onion target and port choice, for a migration leaving a
+ * version that set one: its `down`, or a cross-flavor edge out of it.
+ * Does nothing while Tor is absent or predates the action.
+ */
+export async function clearOnionTarget(
+  sdk: Pick<Sdk, 'getServiceManifest' | 'action'>,
+  effects: T.Effects,
+  binding: OnionBinding,
+) {
+  const torVersion = await sdk
+    .getServiceManifest(effects, 'tor', (m) => m?.version ?? null)
+    .once()
+  await submit(sdk, effects, torVersion, {
+    packageId: binding.packageId,
+    hostId: binding.hostId,
+    internalPort: binding.internalPort,
+    target: null,
+  })
+}
+
+/**
+ * Init and uninit scripts that have Tor forward the .onion addresses of a
+ * binding to another port on the same host, so the service can tell onion
+ * connections from clearnet ones. Pass the result to both `setupInit` and
+ * `setupUninit`.
+ *
+ * Init sets the target, and re-runs whenever Tor is installed or updated.
+ * Uninit clears it on uninstall, the one exit StartOS gives no target
+ * version; a migration leaving the version clears it with `clearOnionTarget`. Both do nothing while Tor is absent
+ * or predates the action.
  */
 export function setupOnionTarget(
   sdk: Pick<Sdk, 'setupOnInit' | 'getServiceManifest' | 'action'>,
@@ -39,7 +92,7 @@ export function setupOnionTarget(
     target: opts.target,
     ...(opts.externalPort == null ? {} : { externalPort: opts.externalPort }),
   }
-  return sdk.setupOnInit(async (effects) => {
+  const { init } = sdk.setupOnInit(async (effects) => {
     // The manifest precedes action registration; lifecycle changes must retry failed calls.
     const torVersion = await sdk
       .getServiceManifest(
@@ -49,21 +102,15 @@ export function setupOnionTarget(
         () => false,
       )
       .const()
-    if (
-      !torVersion ||
-      !ExtendedVersion.parse(torVersion).satisfies(servicesMaySetTargets)
-    )
-      return
-
-    try {
-      await sdk.action.run({
-        effects,
-        packageId: 'tor',
-        actionId: 'set-onion-target',
-        input: () => ({ onionTarget }),
-      })
-    } catch (e) {
-      console.warn(`Onion target not set yet: ${String(e)}`)
-    }
+    await submit(sdk, effects, torVersion, onionTarget)
   })
+  return {
+    init,
+    async uninit(
+      effects: T.Effects,
+      target: VersionRange | ExtendedVersion | null,
+    ) {
+      if (target === null) await clearOnionTarget(sdk, effects, onionTarget)
+    },
+  }
 }
