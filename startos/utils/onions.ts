@@ -43,6 +43,26 @@ export function onionPortSsl(
   return port.nativeProtocol ? binding?.options.secure?.ssl === true : port.ssl
 }
 
+/** An OS-added TLS leg, distinct from the binding's native protocol. */
+export function isAddedSslPort(
+  port: Pick<OnionPort, 'ssl' | 'nativeProtocol'>,
+  binding: Pick<BindingState, 'options'> | null,
+) {
+  return (
+    !port.nativeProtocol && port.ssl && binding?.options.secure?.ssl !== true
+  )
+}
+
+/** Rejects a collision without replacing the existing leg. */
+export function requireAvailableOnionPort(
+  ports: readonly OnionPort[],
+  externalPort: number,
+) {
+  if (ports.some((port) => port.externalPort === externalPort)) {
+    throw new Error(`An onion address already answers on port ${externalPort}`)
+  }
+}
+
 const bindingState = (
   effects: T.Effects,
   opts: { packageId: string; hostId: string; internalPort: number },
@@ -64,8 +84,8 @@ const bindingState = (
 
 /**
  * The bridge address an onion port forwards to: the target its service set with
- * Set Onion Target, or the binding itself. A target that is unbound, disabled or
- * exports an interface is not served.
+ * Set Onion Target while the running version binds it, otherwise the binding
+ * itself. A target that exports an interface is not served.
  */
 export async function watchOnionTarget(
   effects: T.Effects,
@@ -77,14 +97,16 @@ export async function watchOnionTarget(
     bindingState(effects, { packageId, hostId, internalPort }).const()
   const binding = await watch(port.internalPort)
   if (!binding?.enabled || !binding.exported) return null
-  const internalPort =
-    (await storeJson
-      .read((s) => s.targets?.[targetId(packageId, hostId, port.internalPort)])
-      .const(effects)) ?? port.internalPort
-  const target =
-    internalPort === port.internalPort ? binding : await watch(internalPort)
+  const named = await storeJson
+    .read((s) => s.targets?.[targetId(packageId, hostId, port.internalPort)])
+    .const(effects)
+  const candidate = named == null ? null : await watch(named)
+  // A version that doesn't bind the target leaves it disabled or absent.
+  const redirected = named != null && candidate?.enabled === true
   // An exported target is on the LAN, where clearnet clients reach it too.
-  if (!target?.enabled || (target !== binding && target.exported)) return null
+  if (redirected && candidate.exported) return null
+  const internalPort = redirected ? named : port.internalPort
+  const target = redirected ? candidate : binding
   const ssl = onionPortSsl(port, target)
   const address = await sdk.host
     .getBridgeAddress(effects, { packageId, hostId, internalPort, ssl })

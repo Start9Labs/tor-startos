@@ -35,6 +35,11 @@ const shape = z.looseObject({
     .record(z.string(), z.number().optional().catch(undefined))
     .optional()
     .catch(undefined),
+  /** Keyed by `targetId`: the port a binding's service chose for its .onion addresses. */
+  externalPorts: z
+    .record(z.string(), z.number().optional().catch(undefined))
+    .optional()
+    .catch(undefined),
 })
 
 export type Onion = z.infer<typeof onionShape>
